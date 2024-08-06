@@ -1,60 +1,15 @@
-#include <ctype.h>
-#include <stdarg.h>
-#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdbool.h>
 #include <string.h>
-
-//
-// Tokenizer
-//
-
-// トークナイザは、記号か数字か、くらいの区分しかしない
-// 記号の種類を見るのはパーサ
-typedef enum {
-    TK_RESERVED,    // 記号
-    TK_NUM,         // 整数トークン
-    TK_EOF,         // 入力の終わり
-} TokenKind;
-
-typedef struct Token Token;
-
-struct Token {
-    TokenKind kind;     // トークンの型
-    Token *next;        // 次の入力トークン
-    int val;            // kind が TK_NUM の場合はその数値
-    char *str;          // トークンの文字列
-    int len;
-};
+#include <ctype.h>
+#include "9cc.h"
 
 // 入力プログラム
 char *user_input;
 
 // 現在見ているトークン
 Token *token;
-
-// エラーを出力し終了する
-void error(char *fmt, ...) {
-    va_list ap;
-    va_start(ap, fmt);
-    vfprintf(stderr, fmt, ap);
-    fprintf(stderr, "\n");
-    exit(1);
-}
-
-// エラー箇所を報告する
-void error_at(char *loc, char *fmt, ...) {
-    va_list ap;
-    va_start(ap, fmt);
-
-    int pos = loc - user_input;
-    fprintf(stderr, "%s\n", user_input);
-    fprintf(stderr, "%*s", pos, " ");       // pos個の空白を出力
-    fprintf(stderr, "^ ");
-    fprintf(stderr, fmt, ap);
-    fprintf(stderr, "\n");
-    exit(1);
-}
 
 // 次のトークンが期待している記号と同じであればトークンを1つ読み進め真を返す
 // それ以外の場合は偽を返す
@@ -151,33 +106,6 @@ Token *tokenize() {
     return head.next;
 }
 
-//
-// Parser
-//
-
-// AST のノードの種類
-typedef enum {
-    ND_ADD,     // +
-    ND_SUB,     // -
-    ND_MUL,     // *
-    ND_DIV,     // /
-    ND_EQ,      // ==
-    ND_NE,      // !=
-    ND_LT,      // <
-    ND_LE,      // <=
-    ND_NUM,     // 整数
-} NodeKind;
-
-typedef struct Node Node;
-
-// AST のノードの型
-struct Node {
-    NodeKind kind;  // ノードの型
-    Node *lhs;      // 左辺
-    Node *rhs;      // 右辺
-    int val;        // kind が ND_NUM の場合のみ使う
-};
-
 Node *new_node(NodeKind kind, Node *lhs, Node *rhs) {
     Node *node = calloc(1, sizeof(Node));
     node->kind = kind;
@@ -200,14 +128,6 @@ Node *new_node_num(int val) {
 // mul        = unary ("*" unary | "/" unary)*
 // unary      = ("+" | "-")? primary
 // primary    = num | "(" expr ")"
-
-Node *expr();
-Node *equality();
-Node *relational();
-Node *add();
-Node *mul();
-Node *unary();
-Node *primary();
 
 Node *expr() {
     return equality();
@@ -304,81 +224,3 @@ Node *primary() {
     return new_node_num(expect_number());
 }
 
-//
-// Code generator
-//
-
-void gen(Node *node) {
-    if (node->kind == ND_NUM) {
-        printf("  push %d\n", node->val);
-        return;
-    }
-
-    gen(node->lhs);
-    gen(node->rhs);
-
-    printf("  pop rdi\n");
-    printf("  pop rax\n");
-
-    switch (node->kind) {
-    case ND_ADD:
-        printf("  add rax, rdi\n");
-        break;
-    case ND_SUB:
-        printf("  sub rax, rdi\n");
-        break;
-    case ND_MUL:
-        printf("  imul rax, rdi\n");
-        break;
-    case ND_DIV:
-        printf("  cqo\n");
-        printf("  idiv rdi\n");
-        break;
-    case ND_EQ:
-        printf("  cmp rax, rdi\n");
-        printf("  sete al\n");
-        printf("  movzb rax, al\n");
-        break;
-    case ND_NE:
-        printf("  cmp rax, rdi\n");
-        printf("  setne al\n");
-        printf("  movzb rax, al\n");
-        break;
-    case ND_LT:
-        printf("  cmp rax, rdi\n");
-        printf("  setl al\n");
-        printf("  movzb rax, al\n");
-        break;
-    case ND_LE:
-        printf("  cmp rax, rdi\n");
-        printf("  setle al\n");
-        printf("  movzb rax, al\n");
-        break;
-    }
-
-    printf("  push rax\n");
-}
-
-int main(int argc, char **argv) {
-    if (argc != 2) {
-        error("Wrong number of arguments\n");
-    }
-
-    // トークナイズし、パースして AST を作る
-    user_input = argv[1];
-    token = tokenize();
-    Node *node = expr();
-
-    // アセンブリの前半部分を出力
-    printf(".intel_syntax noprefix\n");
-    printf(".globl main\n");
-    printf("main:\n");
-
-    // AST を読み取りコードを生成する
-    gen(node);
-
-    // スタックトップに式全体の値が入っているはずなので RAX にロードする
-    printf("  pop rax\n");
-    printf("  ret\n");
-    return 0;
-}
