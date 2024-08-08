@@ -12,6 +12,7 @@ void error_at(char *loc, char *fmt, ...);
 // 記号の種類を見るのはパーサ
 typedef enum {
     TK_RESERVED,    // 記号
+    TK_IDENT,       // 識別子
     TK_NUM,         // 整数トークン
     TK_EOF,         // 入力の終わり
 } TokenKind;
@@ -44,6 +45,8 @@ typedef enum {
     ND_SUB,     // -
     ND_MUL,     // *
     ND_DIV,     // /
+    ND_ASSIGN,  // =
+    ND_LVAR,    // ローカル変数
     ND_EQ,      // ==
     ND_NE,      // !=
     ND_LT,      // <
@@ -59,15 +62,22 @@ struct Node {
     Node *lhs;      // 左辺
     Node *rhs;      // 右辺
     int val;        // kind が ND_NUM の場合のみ使う
+    int offset;     // kind が ND_LVAR の場合のみ使う
 };
 
+Node *program();
+Node *stmt();
 Node *expr();
+Node *assign();
 Node *equality();
 Node *relational();
 Node *add();
 Node *mul();
 Node *unary();
 Node *primary();
+
+// 各文の ast を入れる
+extern Node *code[100];
 
 //
 // Code generator

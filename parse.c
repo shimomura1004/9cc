@@ -23,6 +23,17 @@ bool consume(char *op) {
     return true;
 }
 
+// 次のトークンが識別子ならトークンを1つ読み進めトークンを返す
+// そうでなければ NULL を返す
+Token *consume_ident() {
+    if (token->kind != TK_IDENT) {
+        return NULL;
+    }
+    Token *t = token;
+    token = token->next;
+    return t;
+}
+
 // 次のトークンが期待している記号と同じであればトークンを1つ読み進める
 // それ以外の場合はエラーを報告する
 void expect(char *op) {
@@ -85,7 +96,7 @@ Token *tokenize() {
         }
 
         // Single-letter punctuator
-        if (strchr("+-*/()<>", *p)) {
+        if (strchr("+-*/()<>;=", *p)) {
             cur = new_token(TK_RESERVED, cur, p++, 1);
             continue;
         }
@@ -96,6 +107,14 @@ Token *tokenize() {
             char *q = p;
             cur->val = strtol(p, &p, 10);
             cur->len = p - q;
+            continue;
+        }
+
+        // Identifier
+        // 変数は1文字とする
+        if ('a' <= *p && *p <= 'z') {
+            cur = new_token(TK_IDENT, cur, p++, 1);
+            cur->len = 1;
             continue;
         }
 
@@ -121,16 +140,51 @@ Node *new_node_num(int val) {
     return node;
 }
 
-// expr       = equality
+Node *new_lvar(char name) {
+    Node *node = calloc(1, sizeof(Node));
+    node->kind = ND_LVAR;
+    node->offset = (name - 'a' + 1) * 8;
+    return node;
+}
+
+// program    = stmt*
+// stmt       = expr ";"
+// expr       = assign
+// assign     = equality ("=" assign)?
 // equality   = relational ("==" relational | "!=" relational)*
 // relational = add ("<" add | "<=" add | ">" add | ">=" add)*
 // add        = mul ("+" mul | "-" mul)*
 // mul        = unary ("*" unary | "/" unary)*
 // unary      = ("+" | "-")? primary
-// primary    = num | "(" expr ")"
+// primary    = num | ident | "(" expr ")"
+
+// プログラムは100文までに制限
+Node *code[100];
+
+Node *program() {
+    int i = 0;
+    while (!at_eof()) {
+        code[i++] = stmt();
+    }
+    code[i] = NULL;
+}
+
+Node *stmt() {
+    Node *node = expr();
+    expect(";");
+    return node;
+}
 
 Node *expr() {
-    return equality();
+    return assign();
+}
+
+Node *assign() {
+    Node *node = equality();
+    if (consume("=")) {
+        node = new_node(ND_ASSIGN, node, assign());
+    }
+    return node;
 }
 
 Node *equality() {
@@ -221,6 +275,10 @@ Node *primary() {
         return node;
     }
 
+    Token *tok = consume_ident();
+    if (tok) {
+        return new_lvar(*tok->str);
+    }
+
     return new_node_num(expect_number());
 }
-
