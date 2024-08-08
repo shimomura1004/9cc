@@ -1,6 +1,8 @@
 #ifndef __9CC_H__
 #define __9CC_H__
 
+#include <stdbool.h>
+
 void error(char *fmt, ...);
 void error_at(char *loc, char *fmt, ...);
 
@@ -33,6 +35,11 @@ extern char *user_input;
 // 現在見ているトークン
 extern Token *token;
 
+bool at_eof();
+bool consume(char *op);
+Token *consume_ident();
+void expect(char *op);
+long int expect_number();
 Token *tokenize();
 
 //
