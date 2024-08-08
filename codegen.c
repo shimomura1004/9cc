@@ -17,6 +17,15 @@ void gen(Node *node) {
     case ND_NUM:
         printf("  push %d\n", node->val);
         return;
+    case ND_RETURN:
+        // return する値を計算しスタックトップに入れる
+        gen(node->lhs);
+        printf("  pop rax\n");
+        printf("  mov rsp, rbp\n");
+        printf("  pop rbp\n");
+        // あとの文があっても無視して ret を出力し脱出
+        printf("  ret\n");
+        return;
     case ND_LVAR:
         gen_lval(node);
         // スタックトップに置かれた代入先のアドレスが指す値を rax にいれる
@@ -81,6 +90,9 @@ void gen(Node *node) {
         printf("  cmp rax, rdi\n");
         printf("  setle al\n");
         printf("  movzb rax, al\n");
+        break;
+    default:
+        error("Unknown node: %d\n", node->kind);
         break;
     }
 

@@ -24,7 +24,7 @@ Node *new_lvar(char name) {
 }
 
 // program    = stmt*
-// stmt       = expr ";"
+// stmt       = expr ";" | "return" expr ";"
 // expr       = assign
 // assign     = equality ("=" assign)?
 // equality   = relational ("==" relational | "!=" relational)*
@@ -46,7 +46,15 @@ Node *program() {
 }
 
 Node *stmt() {
-    Node *node = expr();
+    Node *node;
+
+    if (consume("return")) {
+        node = new_node(ND_RETURN, expr(), NULL);
+    }
+    else {
+        node = expr();
+    }
+
     expect(";");
     return node;
 }
