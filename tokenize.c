@@ -6,6 +6,13 @@
 char *user_input;
 Token *token;
 
+char *strndup(char *p, int len) {
+    char *buf = malloc(len + 1);
+    strncpy(buf, p, len);
+    buf[len] = '\0';
+    return buf;
+}
+
 // 次のトークンが期待している記号と同じであればトークンを1つ読み進め真を返す
 // それ以外の場合は偽を返す
 bool consume(char *op) {
@@ -111,20 +118,22 @@ Token *tokenize() {
             continue;
         }
 
+        // Identifier
+        if (isalpha(*p)) {
+            char *q = p++;
+            while (is_alnum(*p)) {
+                p++;
+            }
+            cur = new_token(TK_IDENT, cur, q, p - q);
+            continue;
+        }
+
         // Integer literal
         if (isdigit(*p)) {
             cur = new_token(TK_NUM, cur, p, 0);
             char *q = p;
             cur->val = strtol(p, &p, 10);
             cur->len = p - q;
-            continue;
-        }
-
-        // Identifier
-        // 変数は1文字とする
-        if ('a' <= *p && *p <= 'z') {
-            cur = new_token(TK_IDENT, cur, p++, 1);
-            cur->len = 1;
             continue;
         }
 

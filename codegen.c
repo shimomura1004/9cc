@@ -1,14 +1,14 @@
 #include <stdio.h>
 #include "9cc.h"
 
+// 変数のオフセットを計算してスタックトップに置く
 void gen_lval(Node *node) {
-    if (node->kind != ND_LVAR) {
+    if (node->kind != ND_VAR) {
         error("L-value of assignment is not a variable");
     }
 
-    // オフセットを計算してスタックトップに置く
     printf("  mov rax, rbp\n");
-    printf("  sub rax, %d\n", node->offset);
+    printf("  sub rax, %d\n", node->var->offset);
     printf("  push rax\n");
 }
 
@@ -26,7 +26,7 @@ void gen(Node *node) {
         // あとの文があっても無視して ret を出力し脱出
         printf("  ret\n");
         return;
-    case ND_LVAR:
+    case ND_VAR:
         gen_lval(node);
         // スタックトップに置かれた代入先のアドレスが指す値を rax にいれる
         printf("  pop rax\n");
@@ -97,4 +97,30 @@ void gen(Node *node) {
     }
 
     printf("  push rax\n");
+}
+
+void codegen(Program *prog) {
+    // アセンブリの前半部分を出力
+    printf(".intel_syntax noprefix\n");
+    printf(".globl main\n");
+    printf("main:\n");
+
+    // プロローグ
+    // 変数26個分の領域を固定で確保する
+    printf("  push rbp\n");
+    printf("  mov rbp, rsp\n");
+    printf("  sub rsp, 208\n");
+
+    // AST を読み取りコードを生成する
+    for (Node *node = prog->node; node; node = node->next) {
+        gen(node);
+        // todo: スタックに文の実行結果が残るのでは？
+    }
+
+    // エピローグ
+    // スタックを戻す
+    printf("  mov rsp, rbp\n");
+    printf("  pop rbp\n");
+    // 最後の式の評価結果が rax に残っているのでそのまま ret すればいい
+    printf("  ret\n");
 }

@@ -34,32 +34,17 @@ int main(int argc, char **argv) {
     // トークナイズし、パースして AST を作る
     user_input = argv[1];
     token = tokenize();
-    program();
+    Program *prog = program();
 
-    // アセンブリの前半部分を出力
-    printf(".intel_syntax noprefix\n");
-    printf(".globl main\n");
-    printf("main:\n");
-
-    // プロローグ
-    // 変数26個分の領域を固定で確保する
-    printf("  push rbp\n");
-    printf("  mov rbp, rsp\n");
-    printf("  sub rsp, 208\n");
-
-    // AST を読み取りコードを生成する
-    for (int i=0; code[i]; i++) {
-        gen(code[i]);
-        // 文の実行結果がスタックに残っているので rax に捨てる
-        printf("  pop rax\n");
+    // それぞれのローカル変数にオフセットの情報を割り当てる
+    int offset = 0;
+    for (Var *var = prog->locals; var; var = var->next) {
+        offset += 8;
+        var->offset = offset;
     }
+    prog->stack_size = offset;
 
-    // エピローグ
-    // スタックを戻す
-    printf("  mov rsp, rbp\n");
-    printf("  pop rbp\n");
-    // 最後の式の評価結果が rax に残っているのでそのまま ret すればいい
-    printf("  ret\n");
+    codegen(prog);
 
     return 0;
 }

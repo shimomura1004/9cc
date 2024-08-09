@@ -20,7 +20,6 @@ typedef enum {
 } TokenKind;
 
 typedef struct Token Token;
-
 struct Token {
     TokenKind kind;     // トークンの型
     Token *next;        // 次の入力トークン
@@ -29,17 +28,23 @@ struct Token {
     int len;
 };
 
-// 入力プログラム
-extern char *user_input;
+// ローカル変数の型
+typedef struct Var Var;
+struct Var {
+    Var *next;
+    char *name;
+    int offset;
+};
 
-// 現在見ているトークン
-extern Token *token;
+extern char *user_input;    // 入力プログラム
+extern Token *token;        // 現在見ているトークン
 
 bool at_eof();
 bool consume(char *op);
 Token *consume_ident();
 void expect(char *op);
 long int expect_number();
+char *strndup(char *p, int len);
 Token *tokenize();
 
 //
@@ -53,44 +58,39 @@ typedef enum {
     ND_MUL,     // *
     ND_DIV,     // /
     ND_ASSIGN,  // =
-    ND_LVAR,    // ローカル変数
+    ND_VAR,     // 変数
     ND_EQ,      // ==
     ND_NE,      // !=
     ND_LT,      // <
     ND_LE,      // <=
     ND_RETURN,  // "return"
-    ND_NUM,     // 整数
+    ND_NUM,     // 整数リテラル
 } NodeKind;
 
-typedef struct Node Node;
-
 // AST のノードの型
+typedef struct Node Node;
 struct Node {
     NodeKind kind;  // ノードの型
+    Node *next;     // 次のノード
     Node *lhs;      // 左辺
     Node *rhs;      // 右辺
+    Var *var;       // kind が ND_VAR の場合のみ使う
     int val;        // kind が ND_NUM の場合のみ使う
-    int offset;     // kind が ND_LVAR の場合のみ使う
 };
 
-Node *program();
-Node *stmt();
-Node *expr();
-Node *assign();
-Node *equality();
-Node *relational();
-Node *add();
-Node *mul();
-Node *unary();
-Node *primary();
+// プログラム全体の情報を保持する構造体
+typedef struct {
+    Node *node;
+    Var *locals;
+    int stack_size;
+} Program;
 
-// 各文の ast を入れる
-extern Node *code[100];
+Program *program();
 
 //
 // Code generator
 //
 
-void gen(Node *node);
+void codegen(Program *prog);
 
 #endif
