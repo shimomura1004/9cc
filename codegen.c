@@ -17,6 +17,11 @@ void gen(Node *node) {
     case ND_NUM:
         printf("  push %d\n", node->val);
         return;
+    case ND_EXPR_STMT:
+        // 代入されない文の場合、スタックトップに入った戻り値は捨てないといけない
+        gen(node->lhs);
+        printf("  add rsp, 8\n");
+        return;
     case ND_RETURN:
         // return する値を計算しスタックトップに入れる
         gen(node->lhs);
@@ -107,18 +112,20 @@ void codegen(Program *prog) {
 
     // プロローグ
     // 変数26個分の領域を固定で確保する
+    printf("# prologue\n");
     printf("  push rbp\n");
     printf("  mov rbp, rsp\n");
     printf("  sub rsp, %d\n", prog->stack_size);
 
+    printf("# program body\n");
     // AST を読み取りコードを生成する
     for (Node *node = prog->node; node; node = node->next) {
         gen(node);
-        // todo: スタックに文の実行結果が残るのでは？
     }
 
     // エピローグ
     // スタックを戻す
+    printf("# epilogue\n");
     printf("  mov rsp, rbp\n");
     printf("  pop rbp\n");
     // 最後の式の評価結果が rax に残っているのでそのまま ret すればいい

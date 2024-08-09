@@ -97,7 +97,7 @@ Node *stmt() {
         node = new_unary(ND_RETURN, expr());
     }
     else {
-        node = expr();
+        node = new_unary(ND_EXPR_STMT, expr());
     }
 
     expect(";");

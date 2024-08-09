@@ -53,18 +53,19 @@ Token *tokenize();
 
 // AST のノードの種類
 typedef enum {
-    ND_ADD,     // +
-    ND_SUB,     // -
-    ND_MUL,     // *
-    ND_DIV,     // /
-    ND_ASSIGN,  // =
-    ND_VAR,     // 変数
-    ND_EQ,      // ==
-    ND_NE,      // !=
-    ND_LT,      // <
-    ND_LE,      // <=
-    ND_RETURN,  // "return"
-    ND_NUM,     // 整数リテラル
+    ND_ADD,         // +
+    ND_SUB,         // -
+    ND_MUL,         // *
+    ND_DIV,         // /
+    ND_ASSIGN,      // =
+    ND_VAR,         // 変数
+    ND_EQ,          // ==
+    ND_NE,          // !=
+    ND_LT,          // <
+    ND_LE,          // <=
+    ND_RETURN,      // "return"
+    ND_EXPR_STMT,   // Expression のみの文
+    ND_NUM,         // 整数リテラル
 } NodeKind;
 
 // AST のノードの型
