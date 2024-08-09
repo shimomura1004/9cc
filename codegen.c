@@ -109,7 +109,7 @@ void codegen(Program *prog) {
     // 変数26個分の領域を固定で確保する
     printf("  push rbp\n");
     printf("  mov rbp, rsp\n");
-    printf("  sub rsp, 208\n");
+    printf("  sub rsp, %d\n", prog->stack_size);
 
     // AST を読み取りコードを生成する
     for (Node *node = prog->node; node; node = node->next) {
