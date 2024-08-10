@@ -66,6 +66,7 @@ typedef enum {
     ND_RETURN,      // "return"
     ND_IF,          // "if"
     ND_WHILE,       // "while"
+    ND_FOR,         // "for"
     ND_EXPR_STMT,   // Expression のみの文
     ND_NUM,         // 整数リテラル
 } NodeKind;
@@ -79,10 +80,12 @@ struct Node {
     Node *lhs;      // 左辺
     Node *rhs;      // 右辺
 
-    // if と while 用の子要素
+    // if と while と for 用の子要素
     Node *cond;     // 条件文
-    Node *then;     // 真の場合のコード
+    Node *then;     // 真の場合のコード、もしくは for/while のループ本体のコード
     Node *els;      // 偽の場合のコード
+    Node *init;     // for の初期化部のコード
+    Node *inc;      // for のインクリメント部のコード
 
     Var *var;       // kind が ND_VAR の場合のみ使う
     int val;        // kind が ND_NUM の場合のみ使う

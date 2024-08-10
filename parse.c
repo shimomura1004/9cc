@@ -127,6 +127,30 @@ Node *stmt() {
         return node;
     }
 
+    // for 文
+    if (consume("for")) {
+        Node *node = new_node(ND_FOR);
+        expect("(");
+        // 初期化部がからっぽの場合はなにも出力しない
+        if (!consume(";")) {
+            // 初期化部の評価結果は捨てる
+            node->init = new_unary(ND_EXPR_STMT, expr());
+            expect(";");
+        }
+        if (!consume(";")) {
+            // 条件部の結果はスタックトップに残す必要がある
+            node->cond = expr();
+            expect(";");
+        }
+        if (!consume(")")) {
+            // インクリメント部の評価結果は捨てる
+            node->inc = new_unary(ND_EXPR_STMT, expr());
+            expect(")");
+        }
+        node->then = stmt();
+        return node;
+    }
+
     // 式のみからなる文
     node = new_unary(ND_EXPR_STMT, expr());
 

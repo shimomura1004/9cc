@@ -81,6 +81,31 @@ void gen(Node *node) {
         printf(".Lend%d:\n", seq);
         return;
     }
+    case ND_FOR: {
+        int seq = labelseq++;
+        if (node->init) {
+            // ループに入る前に初期化部を実行
+            gen(node->init);
+        }
+        printf(".Lbegin%d:\n", seq);
+        if (node->cond) {
+            // 条件部を評価しスタックトップにいれる
+            gen(node->cond);
+            // スタックトップから値を取り出して比較
+            printf("  pop rax\n");
+            printf("  cmp rax, 0\n");
+            printf("  je  .Lend%d\n", seq);
+        }
+        // ループ本体を実行
+        gen(node->then);
+        if (node->inc) {
+            // ループ本体が終了したら、インクリメント部を実行
+            gen(node->inc);
+        }
+        printf("  jmp  .Lbegin%d\n", seq);
+        printf(".Lend%d:\n", seq);
+        return;
+    }
     case ND_VAR:
         gen_lval(node);
         // スタックトップに置かれた代入先のアドレスが指す値を rax にいれる

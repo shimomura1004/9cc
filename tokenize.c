@@ -93,6 +93,7 @@ char *starts_with_reserved(char *p) {
         "if",
         "else",
         "while",
+        "for",
     };
 
     for (int i=0; i < sizeof(kw) / sizeof(*kw); i++) {
