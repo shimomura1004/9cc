@@ -44,8 +44,28 @@ void gen(Node *node) {
             printf("  pop %s\n", argreg[i]);
         }
 
-        // 適切な関数を呼び出す
+        // 関数を呼び出す前に、ABI に準拠するため RSP を16の倍数にしないといけない
+        // 実行時に RSP の値を見て分岐するコードを生成することで対応する
+        int seq = labelseq++;
+        // RSP と 15 のビット論理積を取り、ゼロなら16の倍数になっているのでそのまま
+        // そうでなければ調整が必要
+        printf("  mov rax, rsp\n");
+        printf("  and rax, 15\n");
+        printf("  jnz .Lcall%d\n", seq);
+        printf("  mov rax, 0\n");
+        // 特に調整せずそのまま関数呼び出し
         printf("  call %s\n", node->funcname);
+        printf("  jmp .Lend%d\n", seq);
+
+        // 16の倍数になっていない場合は 8 バイトずらす(RSP は8バイト単位で動くため)
+        printf(".Lcall%d:\n", seq);
+        printf("  sub rsp, 8\n");
+        printf("  mov rax, 0\n");
+        printf("  call %s\n", node->funcname);
+        // この場合は RSP を調整した8バイトだけ戻す
+        printf("  add rsp, 8\n");
+        printf(".Lend%d:\n", seq);
+
         // 戻り値は rax に入って戻って来る
         // 関数呼び出しの結果は関数の戻り値なので、それをスタックトップにいれる
         printf("  push rax\n");
