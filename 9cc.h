@@ -65,6 +65,7 @@ typedef enum {
     ND_LE,          // <=
     ND_RETURN,      // "return"
     ND_IF,          // "if"
+    ND_WHILE,       // "while"
     ND_EXPR_STMT,   // Expression のみの文
     ND_NUM,         // 整数リテラル
 } NodeKind;
@@ -78,7 +79,8 @@ struct Node {
     Node *lhs;      // 左辺
     Node *rhs;      // 右辺
 
-    Node *cond;     // if の条件文
+    // if と while 用の子要素
+    Node *cond;     // 条件文
     Node *then;     // 真の場合のコード
     Node *els;      // 偽の場合のコード
 

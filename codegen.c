@@ -34,7 +34,7 @@ void gen(Node *node) {
         // あとの文があっても無視して ret を出力し脱出
         printf("  ret\n");
         return;
-    case ND_IF:
+    case ND_IF: {
         int seq = labelseq++;
 
         // 条件式を評価しスタックトップに結果を入れる
@@ -65,6 +65,22 @@ void gen(Node *node) {
         printf(".Lend%d:\n", seq);
 
         return;
+    }
+    case ND_WHILE: {
+        int seq = labelseq++;
+        // ループで戻って来るときのためのラベルを追加
+        printf(".Lbegin%d:\n", seq);
+        // 条件部を評価
+        gen(node->cond);
+        printf("  pop rax\n");
+        printf("  cmp rax, 0\n");
+        // 条件を満たしたら末尾にジャンプ
+        printf("  je  .Lend%d\n", seq);
+        gen(node->then);
+        printf("  jmp .Lbegin%d\n", seq);
+        printf(".Lend%d:\n", seq);
+        return;
+    }
     case ND_VAR:
         gen_lval(node);
         // スタックトップに置かれた代入先のアドレスが指す値を rax にいれる

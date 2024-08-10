@@ -106,7 +106,7 @@ Node *stmt() {
 
     // if 文
     if (consume("if")) {
-        Node *node =new_node(ND_IF);
+        Node *node = new_node(ND_IF);
         expect("(");
         node->cond = expr();
         expect(")");
@@ -114,6 +114,16 @@ Node *stmt() {
         if (consume("else")) {
             node->els = stmt();
         }
+        return node;
+    }
+
+    // while 文
+    if (consume("while")) {
+        Node *node = new_node(ND_WHILE);
+        expect("(");
+        node->cond = expr();
+        expect(")");
+        node->then = stmt();
         return node;
     }
 
