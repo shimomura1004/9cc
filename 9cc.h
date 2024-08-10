@@ -91,6 +91,7 @@ struct Node {
     Node *body;     // ブロックの中身の複数の文のコード
 
     char *funcname; // 関数呼び出し
+    Node *args;     // 関数引数
 
     Var *var;       // kind が ND_VAR の場合のみ使う
     int val;        // kind が ND_NUM の場合のみ使う

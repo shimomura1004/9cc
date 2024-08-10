@@ -4,6 +4,9 @@
 // ユニークなラベルを作るための連番
 static int labelseq = 0;
 
+// System V AMD64 ABI で、関数呼び出し時の引数を指定するのに使うレジスタ
+char *argreg[] = { "rdi", "rsi", "rdx", "rcx", "r8", "r9" };
+
 // 変数のオフセットを計算してスタックトップに置く
 void gen_lval(Node *node) {
     if (node->kind != ND_VAR) {
@@ -25,13 +28,29 @@ void gen(Node *node) {
         gen(node->lhs);
         printf("  add rsp, 8\n");
         return;
-    case ND_FUNCALL:
+    case ND_FUNCALL: {
+        // 引数を第一引数から順番に評価し、結果を対応するレジスタにセットする
+        // 実行後は第一引数の評価結果がスタックの深いところに入っている
+        // 最後の引数の評価結果がスタックトップに入っている
+        int nargs = 0;
+        for (Node *arg = node->args; arg; arg = arg->next) {
+            gen(arg);
+            nargs++;
+        }
+
+        // スタックはトップからしかアクセスできない
+        // 後ろの引数から順番に pop してレジスタに入れていく
+        for (int i = nargs - 1; i >= 0; i--) {
+            printf("  pop %s\n", argreg[i]);
+        }
+
         // 適切な関数を呼び出す
         printf("  call %s\n", node->funcname);
         // 戻り値は rax に入って戻って来る
         // 関数呼び出しの結果は関数の戻り値なので、それをスタックトップにいれる
         printf("  push rax\n");
         return;
+    }
     case ND_RETURN:
         // return する値を計算しスタックトップに入れる
         gen(node->lhs);

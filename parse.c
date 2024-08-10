@@ -274,7 +274,25 @@ Node *unary() {
 
 }
 
-// primary = num | ident ( "(" ")" )? | "(" expr ")"
+// func-args = "(" (assign ("," assign)*)? ")"
+Node *func_args() {
+    // ただの変数か関数呼び出しかを判断するため、既に "(" は消費されている
+    // すぐに ")" がきたら引数なしの関数呼び出し
+    if (consume(")")) {
+        return NULL;
+    }
+
+    Node *head = assign();
+    Node *cur = head;
+    while (consume(",")) {
+        cur->next = assign();
+        cur = cur->next;
+    }
+    expect(")");
+    return head;
+}
+
+// primary = num | ident func-args? | "(" expr ")"
 Node *primary() {
     if (consume("(")) {
         Node *node = expr();
@@ -286,9 +304,10 @@ Node *primary() {
     if (tok) {
         if (consume("(")) {
             // 関数呼び出しである場合は関数名を控える
-            expect(")");
             Node *node = new_node(ND_FUNCALL);
             node->funcname = strndup(tok->str, tok->len);
+            // 関数呼び出し時の引数をパース
+            node->args = func_args();
             return node;
         }
 
