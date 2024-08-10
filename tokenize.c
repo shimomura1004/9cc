@@ -111,7 +111,7 @@ char *starts_with_reserved(char *p) {
 char *starts_with_reserved_ops(char *p) {
     static char *ops[] = {
         "==", "!=", "<=", ">=",
-        "+", "-", "*", "/", "(", ")", "<", ">", ";", "=",
+        "+", "-", "*", "/", "(", ")", "<", ">", ";", "=", "{", "}",
     };
 
     // Multi/single-letter punctuator

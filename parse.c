@@ -90,16 +90,15 @@ Program *program() {
 }
 
 // stmt = expr ";"
+//      | "{" stmt* "}"
 //      | "return" expr ";"
 //      | "if" "(" expr ")" stmt ("else" stmt)?
 //      | "while" "(" expr ")" stmt
 //      | "for" "(" expr? ";" expr? ";" expr? ")" stmt
 Node *stmt() {
-    Node *node;
-
     // return 文
     if (consume("return")) {
-        node = new_unary(ND_RETURN, expr());
+        Node *node = new_unary(ND_RETURN, expr());
         expect(";");
         return node;
     }
@@ -151,8 +150,25 @@ Node *stmt() {
         return node;
     }
 
+    // ブロック
+    if (consume("{")) {
+        Node head;
+        head.next = NULL;
+        Node *cur = &head;
+
+        // 中身の複数文を順番にリストに入れていく
+        while (!consume("}")) {
+            cur->next = stmt();
+            cur = cur->next;
+        }
+
+        Node *node = new_node(ND_BLOCK);
+        node->body = head.next;
+        return node;
+    }
+
     // 式のみからなる文
-    node = new_unary(ND_EXPR_STMT, expr());
+    Node *node = new_unary(ND_EXPR_STMT, expr());
 
     expect(";");
     return node;

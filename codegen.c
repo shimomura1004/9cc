@@ -106,6 +106,11 @@ void gen(Node *node) {
         printf(".Lend%d:\n", seq);
         return;
     }
+    case ND_BLOCK:
+        for (Node *n = node->body; n; n = n->next) {
+            gen(n);
+        }
+        return;
     case ND_VAR:
         gen_lval(node);
         // スタックトップに置かれた代入先のアドレスが指す値を rax にいれる
