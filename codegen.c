@@ -1,6 +1,9 @@
 #include <stdio.h>
 #include "9cc.h"
 
+// ユニークなラベルを作るための連番
+static int labelseq = 0;
+
 // 変数のオフセットを計算してスタックトップに置く
 void gen_lval(Node *node) {
     if (node->kind != ND_VAR) {
@@ -30,6 +33,37 @@ void gen(Node *node) {
         printf("  pop rbp\n");
         // あとの文があっても無視して ret を出力し脱出
         printf("  ret\n");
+        return;
+    case ND_IF:
+        int seq = labelseq++;
+
+        // 条件式を評価しスタックトップに結果を入れる
+        gen(node->cond);
+        // 結果を取り出して比較
+        printf("  pop rax\n");
+        printf("  cmp rax, 0\n");
+
+        if (node->els) {
+            // else 節がある場合
+            // 偽だったら else 節にジャンプ
+            printf("  je  .Lelse%d\n", seq);
+            // 真だった場合のコードを生成
+            gen(node->then);
+            printf("  jmp  .Lend%d\n", seq);
+            printf(".Lelse%d:\n", seq);
+            // 偽だった場合のコードを生成
+            gen(node->els);
+        }
+        else {
+            // else 節がない場合
+            // 偽だったら if 文のあとにジャンプ
+            printf("  je  .Lend%d\n", seq);
+            // 真だった場合のコードを生成
+            gen(node->then);
+        }
+
+        printf(".Lend%d:\n", seq);
+
         return;
     case ND_VAR:
         gen_lval(node);

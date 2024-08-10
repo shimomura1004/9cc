@@ -89,16 +89,36 @@ Program *program() {
     return prog;
 }
 
-// stmt = expr ";" | "return" expr ";"
+// stmt = expr ";"
+//      | "return" expr ";"
+//      | "if" "(" expr ")" stmt ("else" stmt)?
+//      | "while" "(" expr ")" stmt
+//      | "for" "(" expr? ";" expr? ";" expr? ")" stmt
 Node *stmt() {
     Node *node;
 
+    // return 文
     if (consume("return")) {
         node = new_unary(ND_RETURN, expr());
+        expect(";");
+        return node;
     }
-    else {
-        node = new_unary(ND_EXPR_STMT, expr());
+
+    // if 文
+    if (consume("if")) {
+        Node *node =new_node(ND_IF);
+        expect("(");
+        node->cond = expr();
+        expect(")");
+        node->then = stmt();
+        if (consume("else")) {
+            node->els = stmt();
+        }
+        return node;
     }
+
+    // 式のみからなる文
+    node = new_unary(ND_EXPR_STMT, expr());
 
     expect(";");
     return node;

@@ -72,16 +72,54 @@ Token *new_token(TokenKind kind, Token *cur, char *str, int len) {
     return tok;
 }
 
-bool startswith(char *p, char *q) {
-    return memcmp(p, q, strlen(q)) == 0;
-}
-
 bool is_alpha(char c) {
     return ('a' <= c && c <= 'z') || ('A' <= c && c <= 'Z') || c == '_';
 }
 
 bool is_alnum(char c) {
     return is_alpha(c) || ('0' <= c && c <= '9');
+}
+
+// 文字列 p の先頭が文字列 q と一致するかを判定
+bool startswith(char *p, char *q) {
+    return memcmp(p, q, strlen(q)) == 0;
+}
+
+// 文字列 p が予約語で始まるかを判定し、その文字列を返す
+char *starts_with_reserved(char *p) {
+    // Keywords
+    static char *kw[] = {
+        "return",
+        "if",
+        "else"
+    };
+
+    for (int i=0; i < sizeof(kw) / sizeof(*kw); i++) {
+        int len = strlen(kw[i]);
+        // 予約語 "if" が、識別子 "iff" を誤認識しないように1文字先読み
+        if (startswith(p, kw[i]) && !is_alnum(p[len])) {
+            return kw[i];
+        }
+    }
+
+    return NULL;
+}
+
+// 文字列 p が演算子で始まるかを判定し、その文字列を返す
+char *starts_with_reserved_ops(char *p) {
+    static char *ops[] = {
+        "==", "!=", "<=", ">=",
+        "+", "-", "*", "/", "(", ")", "<", ">", ";", "=",
+    };
+
+    // Multi/single-letter punctuator
+    for (int i=0; i < sizeof(ops) / sizeof(*ops); i++) {
+        if (startswith(p, ops[i])) {
+            return ops[i];
+        }
+    }
+
+    return NULL;
 }
 
 // 入力文字列 p をトークナイズしてそれを返す
@@ -97,24 +135,20 @@ Token *tokenize() {
             continue;
         }
 
-        // keyword
-        if (startswith(p, "return") && !is_alnum(p[6])) {
-            cur = new_token(TK_RESERVED, cur, p, 6);
-            p += 6;
+        // Keyword
+        char *kw = starts_with_reserved(p);
+        if (kw) {
+            int len = strlen(kw);
+            cur = new_token(TK_RESERVED, cur, p, len);
+            p += len;
             continue;
         }
-
-        // Multi-letter punctuator
-        if (startswith(p, "==") || startswith(p, "!=") ||
-            startswith(p, "<=") || startswith(p, ">=")) {
-            cur = new_token(TK_RESERVED, cur, p, 2);
-            p += 2;
-            continue;
-        }
-
-        // Single-letter punctuator
-        if (strchr("+-*/()<>;=", *p)) {
-            cur = new_token(TK_RESERVED, cur, p++, 1);
+        
+        char *op = starts_with_reserved_ops(p);
+        if (op) {
+            int len = strlen(op);
+            cur = new_token(TK_RESERVED, cur, p, len);
+            p += len;
             continue;
         }
 
