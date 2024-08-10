@@ -25,6 +25,13 @@ void gen(Node *node) {
         gen(node->lhs);
         printf("  add rsp, 8\n");
         return;
+    case ND_FUNCALL:
+        // 適切な関数を呼び出す
+        printf("  call %s\n", node->funcname);
+        // 戻り値は rax に入って戻って来る
+        // 関数呼び出しの結果は関数の戻り値なので、それをスタックトップにいれる
+        printf("  push rax\n");
+        return;
     case ND_RETURN:
         // return する値を計算しスタックトップに入れる
         gen(node->lhs);

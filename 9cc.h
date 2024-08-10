@@ -68,6 +68,7 @@ typedef enum {
     ND_WHILE,       // "while"
     ND_FOR,         // "for"
     ND_BLOCK,       // "{ ... }"
+    ND_FUNCALL,     // 関数呼び出し
     ND_EXPR_STMT,   // Expression のみの文
     ND_NUM,         // 整数リテラル
 } NodeKind;
@@ -81,7 +82,6 @@ struct Node {
     Node *lhs;      // 左辺
     Node *rhs;      // 右辺
 
-    // if と while と for 用の子要素
     Node *cond;     // 条件文
     Node *then;     // 真の場合のコード、もしくは for/while のループ本体のコード
     Node *els;      // 偽の場合のコード
@@ -89,6 +89,8 @@ struct Node {
     Node *inc;      // for のインクリメント部のコード
 
     Node *body;     // ブロックの中身の複数の文のコード
+
+    char *funcname; // 関数呼び出し
 
     Var *var;       // kind が ND_VAR の場合のみ使う
     int val;        // kind が ND_NUM の場合のみ使う

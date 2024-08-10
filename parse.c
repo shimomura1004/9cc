@@ -274,7 +274,7 @@ Node *unary() {
 
 }
 
-// primary = num | ident | "(" expr ")"
+// primary = num | ident ( "(" ")" )? | "(" expr ")"
 Node *primary() {
     if (consume("(")) {
         Node *node = expr();
@@ -284,6 +284,15 @@ Node *primary() {
 
     Token *tok = consume_ident();
     if (tok) {
+        if (consume("(")) {
+            // 関数呼び出しである場合は関数名を控える
+            expect(")");
+            Node *node = new_node(ND_FUNCALL);
+            node->funcname = strndup(tok->str, tok->len);
+            return node;
+        }
+
+        // 関数呼び出しでない場合は通常の変数
         Var *var = find_var(tok);
         if (!var) {
             // 新たな変数であれば locals に追加しておく
