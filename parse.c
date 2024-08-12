@@ -54,6 +54,7 @@ Var *push_var(char *name) {
     return var;
 }
 
+Function *function();
 Node *stmt();
 Node *expr();
 Node *assign();
@@ -64,29 +65,50 @@ Node *mul();
 Node *unary();
 Node *primary();
 
-// program = stmt*
-Program *program() {
+// program = function*
+Function *program() {
+    Function head;
+    head.next = NULL;
+    Function *cur = &head;
+
+    // プログラムは、シンプルに関数定義が複数並んだもの
+    while (!at_eof()) {
+        cur->next = function();
+        cur = cur->next;
+    }
+
+    return head.next;
+}
+
+// function = ident "(" ")" "{" stmt* "}"
+Function *function() {
     // パース中に使う変数の辞書をクリア
     locals = NULL;
+
+    char *name = expect_ident();
+    expect("(");
+    expect(")");
+    expect("{");
 
     Node head;
     head.next = NULL;
     Node *cur = &head;
 
-    // 複数の文を前から順番にリンクさせていく
-    while (!at_eof()) {
-        // program は複数の stmt からなる
+    // 複数の文を前から順番にリストに追加していく
+    while (!consume("}")) {
+        // 関数の中身は複数の stmt からなる
         cur->next = stmt();
         cur = cur->next;
     }
 
-    Program *prog = calloc(1, sizeof(Program));
+    Function *fn = calloc(1, sizeof(Function));
+    fn->name = name;
     // head はダミーのノードなので、その次のノードから使う
-    prog->node = head.next;
+    fn->node = head.next;
     // パース中に作ったローカル変数一覧をそのまま渡す
     // calloc してあるのでこの関数を抜けても問題ない
-    prog->locals = locals;
-    return prog;
+    fn->locals = locals;
+    return fn;
 }
 
 // stmt = expr ";"

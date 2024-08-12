@@ -44,6 +44,7 @@ bool consume(char *op);
 Token *consume_ident();
 void expect(char *op);
 long int expect_number();
+char *expect_ident();
 char *strndup(char *p, int len);
 Token *tokenize();
 
@@ -97,19 +98,23 @@ struct Node {
     int val;        // kind が ND_NUM の場合のみ使う
 };
 
-// プログラム全体の情報を保持する構造体
-typedef struct {
-    Node *node;
-    Var *locals;
-    int stack_size;
-} Program;
+// 関数の情報を保持する構造体
+// プログラムは複数の関数定義が並んだもの
+typedef struct Function Function;
+struct Function {
+    Function *next; // 次の関数定義
+    char *name;     // 定義した関数の名前
+    Node *node;     // 関数の中身
+    Var *locals;    // 関数が使うローカル変数のリスト
+    int stack_size; // 関数が使うスタックのサイズ
+};
 
-Program *program();
+Function *program();
 
 //
 // Code generator
 //
 
-void codegen(Program *prog);
+void codegen(Function *prog);
 
 #endif

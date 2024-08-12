@@ -4,6 +4,9 @@
 // ユニークなラベルを作るための連番
 static int labelseq = 0;
 
+// 今コード生成している関数の名称
+static char *funcname;
+
 // System V AMD64 ABI で、関数呼び出し時の引数を指定するのに使うレジスタ
 char *argreg[] = { "rdi", "rsi", "rdx", "rcx", "r8", "r9" };
 
@@ -75,10 +78,8 @@ void gen(Node *node) {
         // return する値を計算しスタックトップに入れる
         gen(node->lhs);
         printf("  pop rax\n");
-        printf("  mov rsp, rbp\n");
-        printf("  pop rbp\n");
-        // あとの文があっても無視して ret を出力し脱出
-        printf("  ret\n");
+        // 関数を抜ける前の共通処理(epilogue)があるので直接 ret せずジャンプ
+        printf("  jmp .Lreturn.%s\n", funcname);
         return;
     case ND_IF: {
         int seq = labelseq++;
@@ -230,30 +231,34 @@ void gen(Node *node) {
     printf("  push rax\n");
 }
 
-void codegen(Program *prog) {
+void codegen(Function *prog) {
     // アセンブリの前半部分を出力
     printf(".intel_syntax noprefix\n");
-    printf(".globl main\n");
-    printf("main:\n");
 
-    // プロローグ
-    // 変数26個分の領域を固定で確保する
-    printf("# prologue\n");
-    printf("  push rbp\n");
-    printf("  mov rbp, rsp\n");
-    printf("  sub rsp, %d\n", prog->stack_size);
+    for (Function *fn = prog; fn; fn = fn->next) {
+        printf(".globl %s\n", fn->name);
+        printf("%s:\n", fn->name);
+        funcname = fn->name;
 
-    printf("# program body\n");
-    // AST を読み取りコードを生成する
-    for (Node *node = prog->node; node; node = node->next) {
-        gen(node);
+        // プロローグ
+        printf("# prologue\n");
+        printf("  push rbp\n");
+        printf("  mov rbp, rsp\n");
+        printf("  sub rsp, %d\n", fn->stack_size);
+
+        printf("# program body\n");
+        // AST を読み取りコードを生成する
+        for (Node *node = fn->node; node; node = node->next) {
+            gen(node);
+        }
+
+        // エピローグ
+        printf("# epilogue\n");
+        printf(".Lreturn.%s:\n", funcname);
+        // スタックを戻す
+        printf("  mov rsp, rbp\n");
+        printf("  pop rbp\n");
+        // 最後の式の評価結果が rax に残っているのでそのまま ret すればいい
+        printf("  ret\n");
     }
-
-    // エピローグ
-    // スタックを戻す
-    printf("# epilogue\n");
-    printf("  mov rsp, rbp\n");
-    printf("  pop rbp\n");
-    // 最後の式の評価結果が rax に残っているのでそのまま ret すればいい
-    printf("  ret\n");
 }
