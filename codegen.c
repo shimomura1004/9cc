@@ -246,6 +246,13 @@ void codegen(Function *prog) {
         printf("  mov rbp, rsp\n");
         printf("  sub rsp, %d\n", fn->stack_size);
 
+        // レジスタに置かれた引数をスタックに書き込む
+        int i = 0;
+        for (VarList *vl = fn->params;vl; vl = vl->next) {
+            Var *var = vl->var;
+            printf("  mov [rbp-%d], %s\n", var->offset, argreg[i++]);
+        }
+
         printf("# program body\n");
         // AST を読み取りコードを生成する
         for (Node *node = fn->node; node; node = node->next) {

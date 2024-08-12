@@ -3,10 +3,12 @@
 #include <string.h>
 #include "9cc.h"
 
-Var *locals;
+VarList *locals;
 
+// 今パースしている関数内で定義されている変数リストの中から tok を探す
 Var *find_var(Token *tok) {
-    for (Var *var = locals; var; var = var->next) {
+    for (VarList *vl = locals; vl; vl = vl->next) {
+        Var *var = vl->var;
         if (strlen(var->name) == tok->len && !memcmp(tok->str, var->name, tok->len)) {
             return var;
         }
@@ -45,12 +47,15 @@ Node *new_var(Var *var) {
     return node;
 }
 
-// 新しい変数のエントリを作り locals に足す
+// 新しい変数のエントリを作り locals に足し、新しく作った変数を返す
 Var *push_var(char *name) {
     Var *var = calloc(1, sizeof(Var));
-    var->next = locals;
     var->name = name;
-    locals = var;
+
+    VarList *vl = calloc(1, sizeof(VarList));
+    vl->var = var;
+    vl->next = locals;
+    locals = vl;
     return var;
 }
 
@@ -80,14 +85,39 @@ Function *program() {
     return head.next;
 }
 
-// function = ident "(" ")" "{" stmt* "}"
+VarList *read_func_params() {
+    // 引数なしなら NULL を返す
+    if (consume(")")) {
+        return NULL;
+    }
+
+    // 最初の1つは必ず存在するので、それを使って先頭要素を作る
+    VarList *head = calloc(1, sizeof(VarList));
+    head->var = push_var(expect_ident());
+    VarList *cur = head;
+
+    // 閉じ括弧がくるまで変数をパースしてリストにつなげていく
+    while (!consume(")")) {
+        expect(",");
+        cur->next = calloc(1, sizeof(VarList));
+        cur->next->var = push_var(expect_ident());
+        cur = cur->next;
+    }
+
+    return head;
+}
+
+// function = ident "(" params? ")" "{" stmt* "}"
+// params   = ident ("," ident)*
 Function *function() {
     // パース中に使う変数の辞書をクリア
     locals = NULL;
 
-    char *name = expect_ident();
+    Function *fn = calloc(1, sizeof(Function));
+    fn->name = expect_ident();
+
     expect("(");
-    expect(")");
+    fn->params = read_func_params();
     expect("{");
 
     Node head;
@@ -101,8 +131,6 @@ Function *function() {
         cur = cur->next;
     }
 
-    Function *fn = calloc(1, sizeof(Function));
-    fn->name = name;
     // head はダミーのノードなので、その次のノードから使う
     fn->node = head.next;
     // パース中に作ったローカル変数一覧をそのまま渡す

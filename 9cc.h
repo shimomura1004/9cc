@@ -31,9 +31,15 @@ struct Token {
 // ローカル変数の型
 typedef struct Var Var;
 struct Var {
-    Var *next;
     char *name;
     int offset;
+};
+
+// 変数のリスト
+typedef struct VarList VarList;
+struct VarList {
+    VarList *next;
+    Var *var;
 };
 
 extern char *user_input;    // 入力プログラム
@@ -102,11 +108,13 @@ struct Node {
 // プログラムは複数の関数定義が並んだもの
 typedef struct Function Function;
 struct Function {
-    Function *next; // 次の関数定義
-    char *name;     // 定義した関数の名前
-    Node *node;     // 関数の中身
-    Var *locals;    // 関数が使うローカル変数のリスト
-    int stack_size; // 関数が使うスタックのサイズ
+    Function *next;     // 次の関数定義
+    char *name;         // 定義した関数の名前
+    VarList *params;    // 引数のリスト
+
+    Node *node;         // 関数の中身
+    VarList *locals;    // 関数が使うローカル変数のリスト
+    int stack_size;     // 関数が使うスタックのサイズ
 };
 
 Function *program();
