@@ -3,9 +3,6 @@
 
 #include <stdbool.h>
 
-void error(char *fmt, ...);
-void error_at(char *loc, char *fmt, ...);
-
 //
 // Tokenizer
 //
@@ -45,8 +42,12 @@ struct VarList {
 extern char *user_input;    // 入力プログラム
 extern Token *token;        // 現在見ているトークン
 
+void error(char *fmt, ...);
+void error_at(char *loc, char *fmt, ...);
+void error_tok(Token *tok, char *fmt, ...);
+
 bool at_eof();
-bool consume(char *op);
+Token *consume(char *op);
 Token *consume_ident();
 void expect(char *op);
 long int expect_number();
@@ -85,6 +86,7 @@ typedef struct Node Node;
 struct Node {
     NodeKind kind;  // ノードの型
     Node *next;     // 次のノード
+    Token *tok;     // エラーメッセージ用に対応するトークンを保持
 
     Node *lhs;      // 左辺
     Node *rhs;      // 右辺

@@ -15,14 +15,15 @@ char *strndup(char *p, int len) {
 
 // 次のトークンが期待している記号と同じであればトークンを1つ読み進め真を返す
 // それ以外の場合は偽を返す
-bool consume(char *op) {
+Token *consume(char *op) {
     if (token->kind != TK_RESERVED ||
         strlen(op) != token->len ||
         memcmp(token->str, op, token->len)) {
-        return false;
+        return NULL;
     }
+    Token *t = token;
     token = token->next;
-    return true;
+    return t;
 }
 
 // 次のトークンが識別子ならトークンを1つ読み進めトークンを返す
@@ -42,7 +43,7 @@ void expect(char *op) {
     if (token->kind != TK_RESERVED ||
         strlen(op) != token->len ||
         memcmp(token->str, op, token->len)) {
-        error_at(token->str, "not \"%s\"", op);
+        error_tok(token, "expected \"%s\"", op);
     }
     token = token->next;
 }
@@ -51,7 +52,7 @@ void expect(char *op) {
 // それ以外の場合はエラーを報告する
 long int expect_number() {
     if (token->kind != TK_NUM) {
-        error_at(token->str, "not a number");
+        error_tok(token, "expected a number");
     }
     int val = token->val;
     token = token->next;
@@ -62,7 +63,7 @@ long int expect_number() {
 // それ以外の場合はエラーを報告する
 char *expect_ident() {
     if (token->kind != TK_IDENT) {
-        error_at(token->str, "expected an identifier");
+        error_tok(token, "expected an identifier");
     }
     char *s = strndup(token->str, token->len);
     token = token->next;

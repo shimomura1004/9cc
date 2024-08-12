@@ -13,7 +13,7 @@ char *argreg[] = { "rdi", "rsi", "rdx", "rcx", "r8", "r9" };
 // 変数のオフセットを計算してスタックトップに置く
 void gen_lval(Node *node) {
     if (node->kind != ND_VAR) {
-        error("L-value of assignment is not a variable");
+        error_tok(node->tok, "not an lvalue");
     }
 
     printf("  mov rax, rbp\n");
