@@ -126,7 +126,9 @@ void print_node(Node *node, int depth) {
             fprintf(stderr, "%*s]\n", depth, " ");
             break;
         case ND_FUNCALL:
-            fprintf(stderr, "%*sFUNCALL(%s) [\n", depth, " ", node->funcname);
+            fprintf(stderr, "%*sFUNCALL %s : ", depth, " ", node->funcname);
+            print_type(node->ty);
+            fprintf(stderr, " [\n");
             for (Node *arg = node->args; arg; arg = arg->next) {
                 print_node(arg, depth + 2);
             }
@@ -154,11 +156,13 @@ void print_ast(Function *prog) {
 
         VarList *vl = fn->params;
         if (vl) {
-            fprintf(stderr, "%s", vl->var->name);
+            fprintf(stderr, "%s : ", vl->var->name);
+            print_type(vl->var->ty);
             vl = vl->next;
         }
         for (; vl; vl = vl->next) {
-            fprintf(stderr, ", %s", vl->var->name);
+            fprintf(stderr, ", %s : ", vl->var->name);
+            print_type(vl->var->ty);
         }
         fprintf(stderr, ") {\n");
         for (Node *node = fn->node; node; node = node->next) {
