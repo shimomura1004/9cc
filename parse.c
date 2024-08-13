@@ -326,18 +326,24 @@ Node *mul() {
     }
 }
 
-// unary = ("+" | "-")? primary
+// unary = ("+" | "-" | "*" | "&" )? primary
+//       | primary
 Node *unary() {
     Token *tok;
 
-    if (tok = consume("+")) {
+    if (consume("+")) {
         return unary();
     }
-    if (consume("-")) {
+    if (tok = consume("-")) {
         return new_binary(ND_SUB, new_num(0, tok), unary(), tok);
     }
+    if (tok = consume("&")) {
+        return new_unary(ND_ADDR, unary(), tok);
+    }
+    if (consume("*")) {
+        return new_unary(ND_DEREF, unary(), tok);
+    }
     return primary();
-
 }
 
 // func-args = "(" (assign ("," assign)*)? ")"

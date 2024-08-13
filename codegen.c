@@ -1,6 +1,8 @@
 #include <stdio.h>
 #include "9cc.h"
 
+void gen(Node *node);
+
 // ユニークなラベルを作るための連番
 static int labelseq = 0;
 
@@ -10,15 +12,42 @@ static char *funcname;
 // System V AMD64 ABI で、関数呼び出し時の引数を指定するのに使うレジスタ
 char *argreg[] = { "rdi", "rsi", "rdx", "rcx", "r8", "r9" };
 
+// スタックトップにアドレスが入っている前提で
+// アドレスを取り出し、代わりにアドレスが指す値をスタックトップにいれる
+void load() {
+    printf("  pop rax\n");
+    printf("  mov rax, [rax]\n");
+    printf("  push rax\n");
+}
+
+// スタックトップに値、その次にアドレスが入っている前提で
+// アドレスに値を入れ、値を再度スタックトップに入れなおす
+void store() {
+    // 右辺の計算結果を rdi に取り出し
+    printf("  pop rdi\n");
+    // 左辺の変数のアドレスを rax に取り出し
+    printf("  pop rax\n");
+    // 左辺の変数のメモリ領域に右辺の計算結果を入れる
+    printf("  mov [rax], rdi\n");
+    // 代入式は右辺の値を返すので、再び rdi をスタックトップにいれる
+    printf("  push rdi\n");
+}
+
 // 変数のオフセットを計算してスタックトップに置く
-void gen_lval(Node *node) {
-    if (node->kind != ND_VAR) {
-        error_tok(node->tok, "not an lvalue");
+void gen_addr(Node *node) {
+    switch (node->kind) {
+    case ND_VAR:
+        printf("  mov rax, rbp\n");
+        printf("  sub rax, %d\n", node->var->offset);
+        printf("  push rax\n");
+        return;
+    case ND_DEREF:
+        // 代入文の左辺にデリファレンスがあった場合
+        gen(node->lhs);
+        return;
     }
 
-    printf("  mov rax, rbp\n");
-    printf("  sub rax, %d\n", node->var->offset);
-    printf("  push rax\n");
+    error_tok(node->tok, "not an lvalue");
 }
 
 void gen(Node *node) {
@@ -159,26 +188,26 @@ void gen(Node *node) {
         }
         return;
     case ND_VAR:
-        gen_lval(node);
-        // スタックトップに置かれた代入先のアドレスが指す値を rax にいれる
-        printf("  pop rax\n");
-        printf("  mov rax, [rax]\n");
-        printf("  push rax\n");
+        // 指定された変数に対応するアドレスをスタックトップにいれる
+        gen_addr(node);
+        // スタックトップにあるアドレスを値に入れ替え
+        load();
         return;
     case ND_ASSIGN:
         // 左辺の変数のアドレスをスタックトップにいれる
-        gen_lval(node->lhs);
+        gen_addr(node->lhs);
         // 右辺を計算しスタックトップにいれる
         gen(node->rhs);
-
-        // 右辺の計算結果を rdi に取り出し
-        printf("  pop rdi\n");
-        // 左辺の変数のアドレスを rax に取り出し
-        printf("  pop rax\n");
-        // 左辺の変数のメモリ領域に右辺の計算結果を入れる
-        printf("  mov [rax], rdi\n");
-        // 代入式は右辺の値を返すので、再び rdi をスタックトップにいれる
-        printf("  push rdi\n");
+        // スタックに入っている値を、スタックに入っているアドレスに保存
+        store();
+        return;
+    case ND_ADDR:
+        gen_addr(node->lhs);
+        return;
+    case ND_DEREF:
+        gen(node->lhs);
+        // 上記のコードの結果、スタックトップにはアドレスが入っているので、ロード
+        load();
         return;
     }
 
