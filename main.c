@@ -1,5 +1,3 @@
-#include <stdio.h>
-#include <stdlib.h>
 #include <stdarg.h>
 #include "9cc.h"
 
@@ -41,6 +39,7 @@ int main(int argc, char **argv) {
     user_input = argv[1];
     token = tokenize();
     Function *prog = program();
+    add_type(prog);
 
     // 各関数で使われる各ローカル変数にオフセットの情報を割り当てる
     for (Function *fn = prog; fn; fn = fn->next) {

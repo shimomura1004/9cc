@@ -1,11 +1,13 @@
 #include "9cc.h"
 
+// int の型情報を malloc して返す
 Type *int_type() {
     Type *ty = calloc(1, sizeof(Type));
     ty->kind = TY_INT;
     return ty;
 }
 
+// ベースの型情報を受取り、ポインタ型としてラップして返す
 Type *pointer_to(Type *base) {
     Type *ty = calloc(1, sizeof(Type));
     ty->kind = TY_PTR;
@@ -13,6 +15,7 @@ Type *pointer_to(Type *base) {
     return ty;
 }
 
+// 子要素を含めノードに型をつける
 void visit(Node *node) {
     if (!node) {
         return;
@@ -42,10 +45,12 @@ void visit(Node *node) {
     case ND_NE:
     case ND_LT:
     case ND_LE:
-    case ND_VAR:
     case ND_FUNCALL:
     case ND_NUM:
         node->ty = int_type();
+        return;
+    case ND_VAR:
+        node->ty = node->var->ty;
         return;
     case ND_ADD:
         // 足し算の右側がポインタだった場合は左右を入れ替える
@@ -78,13 +83,10 @@ void visit(Node *node) {
         return;
     case ND_DEREF:
         // デリファレンスの場合はポインタ型のネストを1つ削除する
-        if (node->lhs->ty->kind == TY_PTR) {
-            node->ty = node->lhs->ty->base;
+        if (node->lhs->ty->kind != TY_PTR) {
+            error_tok(node->tok, "invalid pointer dereference");
         }
-        else {
-            // todo: ポインタ型でないものをデリファレンスするのはいいのか？
-            node->ty = int_type();
-        }
+        node->ty = node->lhs->ty->base;
         return;
     }
 }

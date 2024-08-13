@@ -47,9 +47,10 @@ Node *new_var(Var *var, Token *tok) {
 }
 
 // 新しい変数のエントリを作り locals に足し、新しく作った変数を返す
-Var *push_var(char *name) {
+Var *push_var(char *name, Type *ty) {
     Var *var = calloc(1, sizeof(Var));
     var->name = name;
+    var->ty = ty;
 
     VarList *vl = calloc(1, sizeof(VarList));
     vl->var = var;
@@ -59,6 +60,7 @@ Var *push_var(char *name) {
 }
 
 Function *function();
+Node *declaration();
 Node *stmt();
 Node *expr();
 Node *assign();
@@ -84,6 +86,26 @@ Function *program() {
     return head.next;
 }
 
+// basetype = "int" "*"*
+// 型宣言を読み取る
+Type *basetype() {
+    expect("int");
+    Type *ty = int_type();
+    while (consume("*")) {
+        ty = pointer_to(ty);
+    }
+    return ty;
+}
+
+// 関数引数の宣言を1つ分読み取る
+// "int* x"
+VarList *read_func_param() {
+    VarList *vl = calloc(1, sizeof(VarList));
+    Type *ty = basetype();
+    vl->var = push_var(expect_ident(), ty);
+    return vl;
+}
+
 VarList *read_func_params() {
     // 引数なしなら NULL を返す
     if (consume(")")) {
@@ -91,33 +113,29 @@ VarList *read_func_params() {
     }
 
     // 最初の1つは必ず存在するので、それを使って先頭要素を作る
-    VarList *head = calloc(1, sizeof(VarList));
-    head->var = push_var(expect_ident());
+    VarList *head = read_func_param();
     VarList *cur = head;
 
     // 閉じ括弧がくるまで変数をパースしてリストにつなげていく
     while (!consume(")")) {
         expect(",");
-        cur->next = calloc(1, sizeof(VarList));
-        cur->next->var = push_var(expect_ident());
+        cur->next = read_func_param();
         cur = cur->next;
     }
 
     return head;
 }
 
-Node *read_expr_stmt() {
-    Token *tok = token;
-    return new_unary(ND_EXPR_STMT, expr(), tok);
-}
-
 // function = ident "(" params? ")" "{" stmt* "}"
-// params   = ident ("," ident)*
+// params   = param ("," param)*
+// param    = basetype ident
 Function *function() {
     // パース中に使う変数の辞書をクリア
     locals = NULL;
 
     Function *fn = calloc(1, sizeof(Function));
+    // 関数の戻り値の型、今は単に無視するだけ
+    basetype();
     fn->name = expect_ident();
 
     expect("(");
@@ -143,12 +161,38 @@ Function *function() {
     return fn;
 }
 
+// declaration = basetype ident ("=" expr) ";"
+Node *declaration() {
+    Token *tok = token;
+    Type *ty = basetype();
+    Var *var = push_var(expect_ident(), ty);
+
+    // 初期値のない変数宣言はからっぽの文になる
+    if (consume(";")) {
+        return new_node(ND_NULL, tok);
+    }
+
+    // 初期値がある場合は代入文になる
+    expect("=");
+    Node *lhs = new_var(var, tok);
+    Node *rhs = expr();
+    expect(";");
+    Node *node = new_binary(ND_ASSIGN, lhs, rhs, tok);
+    return new_unary(ND_EXPR_STMT, node, tok);
+}
+
+Node *read_expr_stmt() {
+    Token *tok = token;
+    return new_unary(ND_EXPR_STMT, expr(), tok);
+}
+
 // stmt = expr ";"
 //      | "{" stmt* "}"
 //      | "return" expr ";"
 //      | "if" "(" expr ")" stmt ("else" stmt)?
 //      | "while" "(" expr ")" stmt
 //      | "for" "(" expr? ";" expr? ";" expr? ")" stmt
+//      | declaration
 Node *stmt() {
     Token *tok;
 
@@ -221,6 +265,10 @@ Node *stmt() {
         Node *node = new_node(ND_BLOCK, tok);
         node->body = head.next;
         return node;
+    }
+
+    if (tok = peek("int")) {
+        return declaration();
     }
 
     // 式のみからなる文
@@ -384,10 +432,8 @@ Node *primary() {
         // 関数呼び出しでない場合は通常の変数
         Var *var = find_var(tok);
         if (!var) {
-            // 新たな変数であれば locals に追加しておく
-            // strndup は malloc で取得した領域に文字列をコピーする
-            // NULL 終端となっているので変数名の長さは覚えなくていい
-            var = push_var(strndup(tok->str, tok->len));
+            // 宣言されていない変数の場合はエラー
+            error_tok(tok, "undefined variable");
         }
         return new_var(var, tok);
     }

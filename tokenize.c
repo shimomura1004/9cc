@@ -12,12 +12,21 @@ char *strndup(char *p, int len) {
     return buf;
 }
 
+// 先頭トークンが文字列 s とマッチしていれば真を返す
+// トークンは進めない
+Token *peek(char *s) {
+    if (token->kind != TK_RESERVED ||
+        strlen(s) != token->len ||
+        memcmp(token->str, s, token->len)) {
+        return NULL;
+    }
+    return token;
+}
+
 // 次のトークンが期待している記号と同じであればトークンを1つ読み進め真を返す
 // それ以外の場合は偽を返す
-Token *consume(char *op) {
-    if (token->kind != TK_RESERVED ||
-        strlen(op) != token->len ||
-        memcmp(token->str, op, token->len)) {
+Token *consume(char *s) {
+    if (!peek(s)) {
         return NULL;
     }
     Token *t = token;
@@ -36,13 +45,11 @@ Token *consume_ident() {
     return t;
 }
 
-// 次のトークンが期待している記号と同じであればトークンを1つ読み進める
+// 次のトークンが期待している文字列と同じであればトークンを1つ読み進める
 // それ以外の場合はエラーを報告する
-void expect(char *op) {
-    if (token->kind != TK_RESERVED ||
-        strlen(op) != token->len ||
-        memcmp(token->str, op, token->len)) {
-        error_tok(token, "expected \"%s\"", op);
+void expect(char *s) {
+    if (!peek(s)) {
+        error_tok(token, "expected \"%s\"", s);
     }
     token = token->next;
 }
@@ -105,6 +112,7 @@ char *starts_with_reserved(char *p) {
         "else",
         "while",
         "for",
+        "int",
     };
 
     for (int i=0; i < sizeof(kw) / sizeof(*kw); i++) {

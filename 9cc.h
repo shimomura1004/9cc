@@ -33,6 +33,7 @@ struct Token {
 typedef struct Var Var;
 struct Var {
     char *name;
+    Type *ty;
     int offset;
 };
 
@@ -51,9 +52,10 @@ void error_at(char *loc, char *fmt, ...);
 void error_tok(Token *tok, char *fmt, ...);
 
 bool at_eof();
-Token *consume(char *op);
+Token *peek(char *s);
+Token *consume(char *s);
 Token *consume_ident();
-void expect(char *op);
+void expect(char *s);
 long int expect_number();
 char *expect_ident();
 char *strndup(char *p, int len);
@@ -85,6 +87,7 @@ typedef enum {
     ND_FUNCALL,     // 関数呼び出し
     ND_EXPR_STMT,   // Expression のみの文
     ND_NUM,         // 整数リテラル
+    ND_NULL,        // 空の文
 } NodeKind;
 
 // AST のノードの型
@@ -141,6 +144,9 @@ struct Type {
     TypeKind kind;
     Type *base;
 };
+
+Type *int_type();
+Type *pointer_to(Type *base);
 
 void add_type(Function *prog);
 
