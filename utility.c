@@ -1,76 +1,84 @@
 #include <stdio.h>
 #include "utility.h"
 
+void print_node(Node *node, int depth);
+
+static char *node_names[] = {
+    "ADD",
+    "SUB",
+    "MUL",
+    "DIV",
+    "ASSIGN",
+    "ADDR",
+    "DEREF",
+    "VAR",
+    "EQ",
+    "NE",
+    "LT",
+    "LE",
+    "RETURN",
+    "IF",
+    "WHILE",
+    "FOR",
+    "BLOCK",
+    "FUNCALL",
+    "EXPR_STMT",
+    "NUM",
+};
+
+void print_type(Type *ty) {
+    if (!ty) {
+        fprintf(stderr, "N/A");
+        return;
+    }
+
+    if (ty->kind == TY_INT) {
+        fprintf(stderr, "int");
+    }
+    else {
+        fprintf(stderr, "*");
+        print_type(ty->base);
+    }
+}
+
+void print_binary_node(Node *node, int depth) {
+    fprintf(stderr, "%*s%s : ", depth, " ", node_names[node->kind]);
+    print_type(node->ty);
+    fprintf(stderr, " = [\n");
+    print_node(node->lhs, depth + 2);
+    print_node(node->rhs, depth + 2);
+    fprintf(stderr, "%*s]\n", depth, " ");
+}
+
+void print_unary_node(Node *node, int depth) {
+    fprintf(stderr, "%*s%s : ", depth, " ", node_names[node->kind]);
+    print_type(node->ty);
+    fprintf(stderr, "\n");
+    print_node(node->lhs, depth + 2);
+}
+
 void print_node(Node *node, int depth) {
     switch (node->kind) {
         case ND_ADD:
-            fprintf(stderr, "%*sADD [\n", depth, " ");
-            print_node(node->lhs, depth + 2);
-            print_node(node->rhs, depth + 2);
-            fprintf(stderr, "%*s]\n", depth, " ");
-            break;
         case ND_SUB:
-            fprintf(stderr, "%*sSUB [\n", depth, " ");
-            print_node(node->lhs, depth + 2);
-            print_node(node->rhs, depth + 2);
-            fprintf(stderr, "%*s]\n", depth, " ");
-            break;
         case ND_MUL:
-            fprintf(stderr, "%*sMUL [\n", depth, " ");
-            print_node(node->lhs, depth + 2);
-            print_node(node->rhs, depth + 2);
-            fprintf(stderr, "%*s]\n", depth, " ");
-            break;
         case ND_DIV:
-            fprintf(stderr, "%*sDIV [\n", depth, " ");
-            print_node(node->lhs, depth + 2);
-            print_node(node->rhs, depth + 2);
-            fprintf(stderr, "%*s]\n", depth, " ");
-            break;
+        case ND_EQ:
+        case ND_LE:
+        case ND_NE:
+        case ND_LT:
         case ND_ASSIGN:
-            fprintf(stderr, "%*sASSIGN [\n", depth, " ");
-            print_node(node->lhs, depth + 2);
-            print_node(node->rhs, depth + 2);
-            fprintf(stderr, "%*s]\n", depth, " ");
+            print_binary_node(node, depth);
             break;
         case ND_ADDR:
-            fprintf(stderr, "%*sADDR\n", depth, " ");
-            print_node(node->lhs, depth + 2);
-            break;
         case ND_DEREF:
-            fprintf(stderr, "%*sDEREF\n", depth, " ");
-            print_node(node->lhs, depth + 2);
+        case ND_RETURN:
+            print_unary_node(node, depth);
             break;
         case ND_VAR:
-            fprintf(stderr, "%*sVAR(%s)\n", depth, " ", node->var->name);
-            break;
-        case ND_EQ:
-            fprintf(stderr, "%*sEQ [\n", depth, " ");
-            print_node(node->lhs, depth + 2);
-            print_node(node->rhs, depth + 2);
-            fprintf(stderr, "%*s]\n", depth, " ");
-            break;
-        case ND_LE:
-            fprintf(stderr, "%*sLE [\n", depth, " ");
-            print_node(node->lhs, depth + 2);
-            print_node(node->rhs, depth + 2);
-            fprintf(stderr, "%*s]\n", depth, " ");
-            break;
-        case ND_NE:
-            fprintf(stderr, "%*sNE [\n", depth, " ");
-            print_node(node->lhs, depth + 2);
-            print_node(node->rhs, depth + 2);
-            fprintf(stderr, "%*s]\n", depth, " ");
-            break;
-        case ND_LT:
-            fprintf(stderr, "%*sLT [\n", depth, " ");
-            print_node(node->lhs, depth + 2);
-            print_node(node->rhs, depth + 2);
-            fprintf(stderr, "%*s]\n", depth, " ");
-            break;
-        case ND_RETURN:
-            fprintf(stderr, "%*sRETURN\n", depth, " ");
-            print_node(node->lhs, depth + 2);
+            fprintf(stderr, "%*sVAR : ", depth, " ");
+            print_type(node->ty);
+            fprintf(stderr, " = '%s\n", node->var->name);
             break;
         case ND_IF:
             fprintf(stderr, "%*sIF [\n", depth, " ");
@@ -125,11 +133,12 @@ void print_node(Node *node, int depth) {
             fprintf(stderr, "%*s]\n", depth, " ");
             break;
         case ND_EXPR_STMT:
-            fprintf(stderr, "%*sEXPR_STMT\n", depth, " ");
-            print_node(node->lhs, depth + 2);
+            print_unary_node(node, depth);
             break;
         case ND_NUM:
-            fprintf(stderr, "%*sNUM(%d)\n", depth, " ", node->val);
+            fprintf(stderr, "%*sNUM : ", depth, " ");
+            print_type(node->ty);
+            fprintf(stderr, " = %d\n", node->val);
             break;
         default:
             fprintf(stderr, "%*s??? (%d)\n", depth, " ", node->kind);
@@ -138,10 +147,10 @@ void print_node(Node *node, int depth) {
 }
 
 void print_ast(Function *prog) {
-    fprintf(stderr, "----------------\n");
+    fprintf(stderr, "--------------------------------\n");
 
     for (Function *fn = prog; fn; fn = fn->next) {
-        fprintf(stderr, "Function %s(", fn->name);
+        fprintf(stderr, "Function %s (", fn->name);
 
         VarList *vl = fn->params;
         if (vl) {
@@ -158,5 +167,5 @@ void print_ast(Function *prog) {
         fprintf(stderr, "}\n");
     }
 
-    fprintf(stderr, "----------------\n");
+    fprintf(stderr, "--------------------------------\n");
 }
