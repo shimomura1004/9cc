@@ -1,7 +1,11 @@
 #ifndef __9CC_H__
 #define __9CC_H__
 
+#include <stdio.h>
+#include <stdlib.h>
 #include <stdbool.h>
+
+typedef struct Type Type;
 
 //
 // Tokenizer
@@ -88,6 +92,7 @@ typedef struct Node Node;
 struct Node {
     NodeKind kind;  // ノードの型
     Node *next;     // 次のノード
+    Type *ty;       // 型情報 (int か *int)
     Token *tok;     // エラーメッセージ用に対応するトークンを保持
 
     Node *lhs;      // 左辺
@@ -122,6 +127,22 @@ struct Function {
 };
 
 Function *program();
+
+//
+// Type
+//
+
+typedef enum {
+    TY_INT,
+    TY_PTR,
+} TypeKind;
+
+struct Type {
+    TypeKind kind;
+    Type *base;
+};
+
+void add_type(Function *prog);
 
 //
 // Code generator

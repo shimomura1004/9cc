@@ -1,4 +1,3 @@
-#include <stdio.h>
 #include "9cc.h"
 
 void gen(Node *node);
@@ -220,9 +219,17 @@ void gen(Node *node) {
 
     switch (node->kind) {
     case ND_ADD:
+        if (node->ty->kind == TY_PTR) {
+            // ポインタ型の加算の場合の特別処理
+            // ポインタへの加算は、ポインタの参照先の型のサイズ分の加算になる
+            printf("  imul rdi, 8\n");
+        }
         printf("  add rax, rdi\n");
         break;
     case ND_SUB:
+        if (node->ty->kind == TY_PTR) {
+            printf("  imul rdi, 8\n");
+        }
         printf("  sub rax, rdi\n");
         break;
     case ND_MUL:
