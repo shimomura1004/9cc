@@ -141,11 +141,21 @@ void print_ast(Function *prog) {
     fprintf(stderr, "----------------\n");
 
     for (Function *fn = prog; fn; fn = fn->next) {
-        fprintf(stderr, "Function(%s) [\n", fn->name);
+        fprintf(stderr, "Function %s(", fn->name);
+
+        VarList *vl = fn->params;
+        if (vl) {
+            fprintf(stderr, "%s", vl->var->name);
+            vl = vl->next;
+        }
+        for (; vl; vl = vl->next) {
+            fprintf(stderr, ", %s", vl->var->name);
+        }
+        fprintf(stderr, ") {\n");
         for (Node *node = fn->node; node; node = node->next) {
             print_node(node, 2);
         }
-        fprintf(stderr, "]\n");
+        fprintf(stderr, "}\n");
     }
 
     fprintf(stderr, "----------------\n");
