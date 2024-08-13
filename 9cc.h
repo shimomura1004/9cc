@@ -61,11 +61,13 @@ Token *tokenize();
 
 // AST のノードの種類
 typedef enum {
-    ND_ADD,         // +
+    ND_ADD = 0,     // +
     ND_SUB,         // -
     ND_MUL,         // *
     ND_DIV,         // /
     ND_ASSIGN,      // =
+    ND_ADDR,        // 単項 &
+    ND_DEREF,       // 単項 *
     ND_VAR,         // 変数
     ND_EQ,          // ==
     ND_NE,          // !=
