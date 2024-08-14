@@ -113,6 +113,7 @@ char *starts_with_reserved(char *p) {
         "while",
         "for",
         "int",
+        "sizeof",
     };
 
     for (int i=0; i < sizeof(kw) / sizeof(*kw); i++) {

@@ -15,6 +15,14 @@ Type *pointer_to(Type *base) {
     return ty;
 }
 
+// 型から変数サイズを計算
+int size_of(Type *ty) {
+    if (ty->kind == TY_INT || ty->kind == TY_PTR) {
+        return 8;
+    }
+    error("invalid type");
+}
+
 // 子要素を含めノードに型をつける
 void visit(Node *node) {
     if (!node) {
@@ -87,6 +95,15 @@ void visit(Node *node) {
             error_tok(node->tok, "invalid pointer dereference");
         }
         node->ty = node->lhs->ty->base;
+        return;
+    case ND_SIZEOF:
+        // sizeof の値の計算はコンパイル時に終わり、AST には sizeof は残らない
+        node->kind = ND_NUM;
+        node->ty = int_type();
+        // 型から値を計算
+        node->val = size_of(node->lhs->ty);
+        // sizeof 演算子の項では値の情報そのものは不要なので削除
+        node->lhs = NULL;
         return;
     }
 }

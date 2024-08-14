@@ -410,15 +410,21 @@ Node *func_args() {
     return head;
 }
 
-// primary = num | ident func-args? | "(" expr ")"
+// todo: なぜ sizeof の lhs は primary ではなく unary？
+// primary = num | ident func-args? | "(" expr ")" | "sizeof" unary
 Node *primary() {
+    Token *tok;
+
     if (consume("(")) {
         Node *node = expr();
         expect(")");
         return node;
     }
 
-    Token *tok;
+    if (tok = consume("sizeof")) {
+        return new_unary(ND_SIZEOF, unary(), tok);
+    }
+
     if (tok = consume_ident()) {
         if (consume("(")) {
             // 関数呼び出しである場合は関数名を控える
