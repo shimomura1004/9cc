@@ -142,6 +142,7 @@ void print_node(Node *node, int depth) {
             print_type(node->ty);
             fprintf(stderr, " = %d\n", node->val);
             break;
+        case ND_SIZEOF: // sizeof は AST に残らないので不要
         default:
             fprintf(stderr, "%*s??? (%d)\n", depth, " ", node->kind);
             break;
@@ -152,7 +153,7 @@ void print_ast(Function *prog) {
     fprintf(stderr, "--------------------------------\n");
 
     for (Function *fn = prog; fn; fn = fn->next) {
-        fprintf(stderr, "Function %s (", fn->name);
+        fprintf(stderr, "FUN %s (", fn->name);
 
         VarList *vl = fn->params;
         if (vl) {
