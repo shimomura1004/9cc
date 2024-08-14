@@ -20,10 +20,12 @@ static char *node_names[] = {
     "IF",
     "WHILE",
     "FOR",
+    "SIZEOF",
     "BLOCK",
     "FUNCALL",
     "EXPR_STMT",
     "NUM",
+    "NULL",
 };
 
 void print_type(Type *ty) {
@@ -36,8 +38,13 @@ void print_type(Type *ty) {
         fprintf(stderr, "int");
     }
     else {
-        fprintf(stderr, "*");
         print_type(ty->base);
+        if (ty->kind == TY_ARRAY) {
+            fprintf(stderr, "[]");
+        }
+        else {
+            fprintf(stderr, "*");
+        }
     }
 }
 
@@ -141,6 +148,9 @@ void print_node(Node *node, int depth) {
             fprintf(stderr, "%*sNUM : ", depth, " ");
             print_type(node->ty);
             fprintf(stderr, " = %d\n", node->val);
+            break;
+        case ND_NULL:
+            fprintf(stderr, "%*sNULL\n", depth, " ");
             break;
         case ND_SIZEOF: // sizeof は AST に残らないので不要
         default:
