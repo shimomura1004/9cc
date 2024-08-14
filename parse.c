@@ -97,12 +97,27 @@ Type *basetype() {
     return ty;
 }
 
+// 型の後置修飾語(配列の括弧)をパース
+Type *read_type_suffix(Type *base) {
+    if (!consume("[")) {
+        return base;
+    }
+    int sz = expect_number();
+    expect("]");
+    // さらに後ろをパースし、配列型とする
+    base = read_type_suffix(base);
+    return array_of(base, sz);
+}
+
 // 関数引数の宣言を1つ分読み取る
-// "int* x"
+// e.g. "int *x[10]"
 VarList *read_func_param() {
-    VarList *vl = calloc(1, sizeof(VarList));
     Type *ty = basetype();
-    vl->var = push_var(expect_ident(), ty);
+    char *name = expect_ident();
+    ty = read_type_suffix(ty);
+
+    VarList *vl = calloc(1, sizeof(VarList));
+    vl->var = push_var(name, ty);
     return vl;
 }
 
@@ -161,11 +176,13 @@ Function *function() {
     return fn;
 }
 
-// declaration = basetype ident ("=" expr) ";"
+// declaration = basetype ident ("[" num "]")* ("=" expr)? ";"
 Node *declaration() {
     Token *tok = token;
     Type *ty = basetype();
-    Var *var = push_var(expect_ident(), ty);
+    char *name = expect_ident();
+    ty = read_type_suffix(ty);
+    Var *var = push_var(name, ty);
 
     // 初期値のない変数宣言はからっぽの文になる
     if (consume(";")) {

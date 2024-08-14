@@ -49,6 +49,16 @@ void gen_addr(Node *node) {
     error_tok(node->tok, "not an lvalue");
 }
 
+// 左辺値のためのコードを生成する
+void gen_lval(Node *node) {
+    if (node->ty->kind == TY_ARRAY) {
+        // 配列型変数への代入はできない
+        // int x[2] のとき x = NULL はコンパイルエラーになる
+        error_tok(node->tok, "not an lvalue");
+    }
+    gen_addr(node);
+}
+
 void gen(Node *node) {
     switch (node->kind) {
     case ND_NULL:
@@ -191,12 +201,16 @@ void gen(Node *node) {
     case ND_VAR:
         // 指定された変数に対応するアドレスをスタックトップにいれる
         gen_addr(node);
-        // スタックトップにあるアドレスを値に入れ替え
-        load();
+        if (node->ty->kind != TY_ARRAY) {
+            // 変数の型が配列でなければアドレスを指す先の値に入れ替え
+            // 変数の型が配列のときになにもしない理由は、
+            // int x[2] のとき x は配列の先頭アドレスそのものを表すから
+            load();
+        }
         return;
     case ND_ASSIGN:
         // 左辺の変数のアドレスをスタックトップにいれる
-        gen_addr(node->lhs);
+        gen_lval(node->lhs);
         // 右辺を計算しスタックトップにいれる
         gen(node->rhs);
         // スタックに入っている値を、スタックに入っているアドレスに保存
@@ -207,8 +221,14 @@ void gen(Node *node) {
         return;
     case ND_DEREF:
         gen(node->lhs);
-        // 上記のコードの結果、スタックトップにはアドレスが入っているので、ロード
-        load();
+        if (node->ty->kind != TY_ARRAY) {
+            // この node の型が配列型ということなので、deref した結果の型が配列ということ
+            // 上記のコードの結果、スタックトップにはアドレスが入っているので、ロード
+            // int x[2][2] とのき x と *x は同じくアドレスを指すので load は不要
+            // int x[2] のとき *x は値となるので load が必要だが、
+            // その場合はこの node の型が配列ではなく var になるので問題ない
+            load();
+        }
         return;
     }
 
@@ -221,16 +241,16 @@ void gen(Node *node) {
 
     switch (node->kind) {
     case ND_ADD:
-        if (node->ty->kind == TY_PTR) {
-            // ポインタ型の加算の場合の特別処理
+        if (node->ty->base) {
+            // ポインタ型か配列型の加算の場合の特別処理
             // ポインタへの加算は、ポインタの参照先の型のサイズ分の加算になる
-            printf("  imul rdi, 8\n");
+            printf("  imul rdi, %d\n", size_of(node->ty->base));
         }
         printf("  add rax, rdi\n");
         break;
     case ND_SUB:
-        if (node->ty->kind == TY_PTR) {
-            printf("  imul rdi, 8\n");
+        if (node->ty->base) {
+            printf("  imul rdi, %d\n", size_of(node->ty->base));
         }
         printf("  sub rax, rdi\n");
         break;

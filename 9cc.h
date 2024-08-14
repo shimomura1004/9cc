@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>
+#include <assert.h>
 
 typedef struct Type Type;
 
@@ -139,15 +140,19 @@ Function *program();
 typedef enum {
     TY_INT,
     TY_PTR,
+    TY_ARRAY,
 } TypeKind;
 
 struct Type {
     TypeKind kind;
     Type *base;
+    int array_size;
 };
 
 Type *int_type();
 Type *pointer_to(Type *base);
+Type *array_of(Type *base, int size);
+int size_of(Type *ty);
 
 void add_type(Function *prog);
 
