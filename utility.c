@@ -83,9 +83,9 @@ void print_node(Node *node, int depth) {
             print_unary_node(node, depth);
             break;
         case ND_VAR:
-            fprintf(stderr, "%*sVAR : ", depth, " ");
+            fprintf(stderr, "%*sVAR %s : ", depth, " ", node->var->name);
             print_type(node->ty);
-            fprintf(stderr, " = '%s\n", node->var->name);
+            fprintf(stderr, "\n");
             break;
         case ND_IF:
             fprintf(stderr, "%*sIF [\n", depth, " ");
