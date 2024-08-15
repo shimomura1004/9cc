@@ -38,11 +38,11 @@ int main(int argc, char **argv) {
     // トークナイズし、パースして AST を作る
     user_input = argv[1];
     token = tokenize();
-    Function *prog = program();
+    Program *prog = program();
     add_type(prog);
 
     // 各関数で使われる各ローカル変数にオフセットの情報を割り当てる
-    for (Function *fn = prog; fn; fn = fn->next) {
+    for (Function *fn = prog->fns; fn; fn = fn->next) {
         int offset = 0;
         for (VarList *vl = fn->locals; vl; vl = vl->next) {
             Var *var = vl->var;

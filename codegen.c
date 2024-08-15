@@ -35,11 +35,19 @@ void store() {
 // 変数のオフセットを計算してスタックトップに置く
 void gen_addr(Node *node) {
     switch (node->kind) {
-    case ND_VAR:
-        printf("  mov rax, rbp\n");
-        printf("  sub rax, %d\n", node->var->offset);
-        printf("  push rax\n");
+    case ND_VAR: {
+        Var *var = node->var;
+
+        if (var->is_local) {
+            printf("  mov rax, rbp\n");
+            printf("  sub rax, %d\n", var->offset);
+            printf("  push rax\n");
+        }
+        else {
+            printf("  push offset %s\n", var->name);
+        }
         return;
+    }
     case ND_DEREF:
         // 代入文の左辺にデリファレンスがあった場合
         gen(node->lhs);
@@ -289,11 +297,27 @@ void gen(Node *node) {
     printf("  push rax\n");
 }
 
-void codegen(Function *prog) {
-    // アセンブリの前半部分を出力
-    printf(".intel_syntax noprefix\n");
+// データ領域を出力
+void emit_data(Program *prog) {
+    // 0 初期化するのであれば .data ではなく .bss に置くほうがベター
+    // ELF ファイルのサイズが小さくなるため
+    printf(".data\n");
 
-    for (Function *fn = prog; fn; fn = fn->next) {
+    for (VarList *vl = prog->globals; vl; vl = vl->next) {
+        Var *var = vl->var;
+        // グローバル変数もアセンブラ上のラベルで表現される
+        // ラベルは単にアドレスのエイリアス
+        printf("%s:\n", var->name);
+        // .zero は、指定したバイト数分の領域を 0 初期化して確保する
+        printf("  .zero %d\n", size_of(var->ty));
+    }
+}
+
+// テキスト領域を出力
+void emit_text(Program *prog) {
+    printf(".text\n");
+
+    for (Function *fn = prog->fns; fn; fn = fn->next) {
         printf(".globl %s\n", fn->name);
         printf("%s:\n", fn->name);
         funcname = fn->name;
@@ -326,4 +350,10 @@ void codegen(Function *prog) {
         // 最後の式の評価結果が rax に残っているのでそのまま ret すればいい
         printf("  ret\n");
     }
+}
+
+void codegen(Program *prog) {
+    printf(".intel_syntax noprefix\n");
+    emit_data(prog);
+    emit_text(prog);
 }

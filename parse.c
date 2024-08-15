@@ -2,15 +2,26 @@
 #include "9cc.h"
 
 VarList *locals;
+VarList *globals;
 
-// 今パースしている関数内で定義されている変数リストの中から tok を探す
+// 今パースしている関数のスコープ内で定義されている変数リストの中から tok を探す
 Var *find_var(Token *tok) {
+    // まずローカル変数から探す
     for (VarList *vl = locals; vl; vl = vl->next) {
         Var *var = vl->var;
         if (strlen(var->name) == tok->len && !memcmp(tok->str, var->name, tok->len)) {
             return var;
         }
     }
+
+    // ローカル変数になければグローバル変数を探す
+    for (VarList *vl = globals; vl; vl = vl->next) {
+        Var *var = vl->var;
+        if (strlen(var->name) == tok->len && !memcmp(tok->str, var->name, tok->len)) {
+            return var;
+        }
+    }
+
     return NULL;
 }
 
@@ -46,20 +57,32 @@ Node *new_var(Var *var, Token *tok) {
     return node;
 }
 
-// 新しい変数のエントリを作り locals に足し、新しく作った変数を返す
-Var *push_var(char *name, Type *ty) {
+// 新しい変数のエントリを作って変数リストに足し、新しく作った変数を返す
+Var *push_var(char *name, Type *ty, bool is_local) {
     Var *var = calloc(1, sizeof(Var));
     var->name = name;
     var->ty = ty;
+    var->is_local = is_local;
 
     VarList *vl = calloc(1, sizeof(VarList));
     vl->var = var;
-    vl->next = locals;
-    locals = vl;
+
+    // ローカル変数かグローバル変数かで追加するリストを変える
+    if (is_local) {
+        vl->next = locals;
+        locals = vl;
+    }
+    else {
+        vl->next = globals;
+        globals = vl;
+    }
+
     return var;
 }
 
 Function *function();
+Type *basetype();
+void global_var();
 Node *declaration();
 Node *stmt();
 Node *expr();
@@ -72,19 +95,42 @@ Node *unary();
 Node *postfix();
 Node *primary();
 
-// program = function*
-Function *program() {
+bool is_functon() {
+    // basetype や consume_ident などで先読みするとトークンを消費してしまう
+    // 最初にトークンの位置を控えておく
+    Token *tok = token;
+
+    basetype();
+    // 変数宣言か関数定義かは、識別子のあとに "(" が出てくるか見るまでわからない
+    bool isfunc = consume_ident() && consume("(");
+
+    // 読み進めてしまったトークンを戻す
+    token = tok;
+    return isfunc;
+}
+
+// program = (global-var | function)*
+Program *program() {
     Function head;
     head.next = NULL;
     Function *cur = &head;
+    globals = NULL;
 
-    // プログラムは、シンプルに関数定義が複数並んだもの
+    // プログラムは、グローバル変数の宣言か関数定義が複数並んだもの
     while (!at_eof()) {
-        cur->next = function();
-        cur = cur->next;
+        if (is_functon()) {
+            cur->next = function();
+            cur = cur->next;
+        }
+        else {
+            global_var();
+        }
     }
 
-    return head.next;
+    Program *prog = calloc(1, sizeof(Program));
+    prog->globals = globals;
+    prog->fns = head.next;
+    return prog;
 }
 
 // basetype = "int" "*"*
@@ -118,7 +164,7 @@ VarList *read_func_param() {
     ty = read_type_suffix(ty);
 
     VarList *vl = calloc(1, sizeof(VarList));
-    vl->var = push_var(name, ty);
+    vl->var = push_var(name, ty, true);
     return vl;
 }
 
@@ -177,13 +223,22 @@ Function *function() {
     return fn;
 }
 
+// global-var = basetype ident ( "[" num "]" )* "+"
+void global_var() {
+    Type *ty = basetype();
+    char *name = expect_ident();
+    ty = read_type_suffix(ty);
+    expect(";");
+    push_var(name, ty, false);
+}
+
 // declaration = basetype ident ("[" num "]")* ("=" expr)? ";"
 Node *declaration() {
     Token *tok = token;
     Type *ty = basetype();
     char *name = expect_ident();
     ty = read_type_suffix(ty);
-    Var *var = push_var(name, ty);
+    Var *var = push_var(name, ty, true);
 
     // 初期値のない変数宣言はからっぽの文になる
     if (consume(";")) {

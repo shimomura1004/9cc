@@ -30,12 +30,14 @@ struct Token {
     int len;
 };
 
-// ローカル変数の型
+// 変数の型
 typedef struct Var Var;
 struct Var {
-    char *name;
+    char *name;     // 変数名
     Type *ty;
-    int offset;
+    bool is_local;  // ローカル変数かグローバル変数か
+
+    int offset;     // RBP からのオフセット(ローカル変数のときのみ使用)
 };
 
 // 変数のリスト
@@ -119,7 +121,6 @@ struct Node {
 };
 
 // 関数の情報を保持する構造体
-// プログラムは複数の関数定義が並んだもの
 typedef struct Function Function;
 struct Function {
     Function *next;     // 次の関数定義
@@ -131,7 +132,14 @@ struct Function {
     int stack_size;     // 関数が使うスタックのサイズ
 };
 
-Function *program();
+// プログラムの情報を保持する構造体
+// 関数とグローバル変数のリストからなる
+typedef struct {
+    VarList *globals;
+    Function *fns;
+} Program;
+
+Program *program();
 
 //
 // Type
@@ -154,12 +162,12 @@ Type *pointer_to(Type *base);
 Type *array_of(Type *base, int size);
 int size_of(Type *ty);
 
-void add_type(Function *prog);
+void add_type(Program *prog);
 
 //
 // Code generator
 //
 
-void codegen(Function *prog);
+void codegen(Program *prog);
 
 #endif
