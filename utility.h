@@ -3,6 +3,6 @@
 
 #include "9cc.h"
 
-void print_ast(Function *prog);
+void print_ast(Program *prog);
 
 #endif

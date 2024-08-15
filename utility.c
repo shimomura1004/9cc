@@ -159,10 +159,8 @@ void print_node(Node *node, int depth) {
     }
 }
 
-void print_ast(Function *prog) {
-    fprintf(stderr, "--------------------------------\n");
-
-    for (Function *fn = prog; fn; fn = fn->next) {
+void print_functions(Function *fn) {
+    for (; fn; fn = fn->next) {
         fprintf(stderr, "FUN %s (", fn->name);
 
         VarList *vl = fn->params;
@@ -181,6 +179,20 @@ void print_ast(Function *prog) {
         }
         fprintf(stderr, "}\n");
     }
+}
 
+void print_global_variables(VarList *vl) {
+    for (; vl; vl = vl->next) {
+        fprintf(stderr, "VAR %s : ",vl->var->name);
+        print_type(vl->var->ty);
+        fprintf(stderr, "\n");
+    }
+}
+
+void print_ast(Program *prog) {
+    fprintf(stderr, "--------------------------------\n");
+    print_global_variables(prog->globals);
+    fprintf(stderr, "--------------------------------\n");
+    print_functions(prog->fns);
     fprintf(stderr, "--------------------------------\n");
 }
