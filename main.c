@@ -30,6 +30,11 @@ void error_tok(Token *tok, char *fmt, ...) {
     exit(1);
 }
 
+// 数値 n を、次の align の倍数に切り上げる
+int align_to(int n, int align) {
+    return (n + align - 1) & ~(align - 1);
+}
+
 int main(int argc, char **argv) {
     if (argc != 2) {
         error("Wrong number of arguments\n");
@@ -49,7 +54,8 @@ int main(int argc, char **argv) {
             offset += size_of(var->ty);
             var->offset = offset;
         }
-        fn->stack_size = offset;
+        // char などでスタックサイズが8の倍数からずれる可能性があるので調整
+        fn->stack_size = align_to(offset, 8);
     }
 
     codegen(prog);

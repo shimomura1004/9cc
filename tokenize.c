@@ -113,6 +113,7 @@ char *starts_with_reserved(char *p) {
         "while",
         "for",
         "int",
+        "char",
         "sizeof",
     };
 

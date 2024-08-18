@@ -9,25 +9,40 @@ static int labelseq = 0;
 static char *funcname;
 
 // System V AMD64 ABI で、関数呼び出し時の引数を指定するのに使うレジスタ
-char *argreg[] = { "rdi", "rsi", "rdx", "rcx", "r8", "r9" };
+char *argreg1[] = { "dil", "sil", "dl", "cl", "r8b", "r9b" };
+char *argreg8[] = { "rdi", "rsi", "rdx", "rcx", "r8", "r9" };
 
 // スタックトップにアドレスが入っている前提で
 // アドレスを取り出し、代わりにアドレスが指す値をスタックトップにいれる
-void load() {
+// x86 では扱うデータのバイト数によってレジスタが異なる
+void load(Type *ty) {
     printf("  pop rax\n");
-    printf("  mov rax, [rax]\n");
+    if (size_of(ty) == 1) {
+        // rax が指すアドレスから1バイト読んで rax にいれる
+        printf("  movsx rax, byte ptr [rax]\n");
+    }
+    else {
+        // rax が指すアドレスから8バイト読んで rax にいれる
+        printf("  mov rax, [rax]\n");
+    }
     printf("  push rax\n");
 }
 
 // スタックトップに値、その次にアドレスが入っている前提で
 // アドレスに値を入れ、値を再度スタックトップに入れなおす
-void store() {
+void store(Type *ty) {
     // 右辺の計算結果を rdi に取り出し
     printf("  pop rdi\n");
     // 左辺の変数のアドレスを rax に取り出し
     printf("  pop rax\n");
     // 左辺の変数のメモリ領域に右辺の計算結果を入れる
-    printf("  mov [rax], rdi\n");
+    if (size_of(ty) == 1) {
+        // dil は rdi の最下位1バイト
+        printf("  mov [rax], dil\n");
+    }
+    else {
+        printf("  mov [rax], rdi\n");
+    }
     // 代入式は右辺の値を返すので、再び rdi をスタックトップにいれる
     printf("  push rdi\n");
 }
@@ -89,10 +104,11 @@ void gen(Node *node) {
             nargs++;
         }
 
-        // スタックはトップからしかアクセスできない
+        // スタックはトップからしかアクセスできないので
         // 後ろの引数から順番に pop してレジスタに入れていく
+        // 引数の型が char でも int と同じレジスタを使う
         for (int i = nargs - 1; i >= 0; i--) {
-            printf("  pop %s\n", argreg[i]);
+            printf("  pop %s\n", argreg8[i]);
         }
 
         // 関数を呼び出す前に、ABI に準拠するため RSP を16の倍数にしないといけない
@@ -213,7 +229,7 @@ void gen(Node *node) {
             // 変数の型が配列でなければアドレスを指す先の値に入れ替え
             // 変数の型が配列のときになにもしない理由は、
             // int x[2] のとき x は配列の先頭アドレスそのものを表すから
-            load();
+            load(node->ty);
         }
         return;
     case ND_ASSIGN:
@@ -222,7 +238,7 @@ void gen(Node *node) {
         // 右辺を計算しスタックトップにいれる
         gen(node->rhs);
         // スタックに入っている値を、スタックに入っているアドレスに保存
-        store();
+        store(node->ty);
         return;
     case ND_ADDR:
         gen_addr(node->lhs);
@@ -235,7 +251,7 @@ void gen(Node *node) {
             // int x[2][2] とのき x と *x は同じくアドレスを指すので load は不要
             // int x[2] のとき *x は値となるので load が必要だが、
             // その場合はこの node の型が配列ではなく var になるので問題ない
-            load();
+            load(node->ty);
         }
         return;
     }
@@ -313,6 +329,18 @@ void emit_data(Program *prog) {
     }
 }
 
+// 引数の型に応じて読み取るレジスタを変える
+void load_arg(Var *var, int idx) {
+    int sz = size_of(var->ty);
+    if (sz == 1) {
+        printf("  mov [rbp-%d], %s\n", var->offset, argreg1[idx]);
+    }
+    else {
+        assert(sz == 8);
+        printf("  mov [rbp-%d], %s\n", var->offset, argreg8[idx]);
+    }
+}
+
 // テキスト領域を出力
 void emit_text(Program *prog) {
     printf(".text\n");
@@ -331,8 +359,7 @@ void emit_text(Program *prog) {
         // レジスタに置かれた引数をスタックに書き込む
         int i = 0;
         for (VarList *vl = fn->params;vl; vl = vl->next) {
-            Var *var = vl->var;
-            printf("  mov [rbp-%d], %s\n", var->offset, argreg[i++]);
+            load_arg(vl->var, i++);
         }
 
         printf("# program body\n");
