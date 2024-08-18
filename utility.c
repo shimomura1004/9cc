@@ -34,17 +34,24 @@ void print_type(Type *ty) {
         return;
     }
 
-    if (ty->kind == TY_INT) {
+    switch (ty->kind) {
+    case TY_CHAR:
+        fprintf(stderr, "char");
+        return;
+    case TY_INT:
         fprintf(stderr, "int");
-    }
-    else {
+        return;
+    case TY_ARRAY:
         print_type(ty->base);
-        if (ty->kind == TY_ARRAY) {
-            fprintf(stderr, "[]");
-        }
-        else {
-            fprintf(stderr, "*");
-        }
+        fprintf(stderr, "[]");
+        return;
+    case TY_PTR:
+        print_type(ty->base);
+        fprintf(stderr, "*");
+        return;
+    default:
+        fprintf(stderr, "???");
+        return;
     }
 }
 
