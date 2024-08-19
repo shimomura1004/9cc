@@ -324,8 +324,19 @@ void emit_data(Program *prog) {
         // グローバル変数もアセンブラ上のラベルで表現される
         // ラベルは単にアドレスのエイリアス
         printf("%s:\n", var->name);
-        // .zero は、指定したバイト数分の領域を 0 初期化して確保する
-        printf("  .zero %d\n", size_of(var->ty));
+
+        if (!var->contents) {
+            // コンテンツがないということは、これは文字列ではない
+            // グローバル変数の場合はゼロ初期化する
+            // .zero は、指定したバイト数分の領域を 0 初期化して確保する
+            printf("  .zero %d\n", size_of(var->ty));
+            continue;
+        }
+
+        // 文字列リテラルの場合は一文字ずつ出力
+        for (int i = 0; i < var->cont_len; i++) {
+            printf("  .byte %d\n", var->contents[i]);
+        }
     }
 }
 

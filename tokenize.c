@@ -186,6 +186,25 @@ Token *tokenize() {
             continue;
         }
 
+        // String literal
+        if (*p == '"') {
+            char *q = p++;
+            while (*p && *p != '"') {
+                p++;
+            }
+            if (!*p) {
+                // ダブルクオートがないまま末尾に達した場合
+                error_at(q, "unclosed string literal");
+            }
+            p++;
+
+            cur = new_token(TK_STR, cur, q, p - q);
+            // ダブルクオートで囲まれた中身だけコピー
+            cur->contents = strndup(q + 1, p - q - 2);
+            cur->cont_len = p - q - 1;
+            continue;
+        }
+
         // Integer literal
         if (isdigit(*p)) {
             cur = new_token(TK_NUM, cur, p, 0);

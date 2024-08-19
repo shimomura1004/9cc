@@ -80,6 +80,13 @@ Var *push_var(char *name, Type *ty, bool is_local) {
     return var;
 }
 
+char *new_label() {
+    static int cnt = 0;
+    char buf[20];
+    sprintf(buf, ".L.data.%d", cnt++);
+    return strndup(buf, 20);
+}
+
 Function *function();
 Type *basetype();
 void global_var();
@@ -510,7 +517,7 @@ Node *func_args() {
 }
 
 // todo: なぜ sizeof の lhs は primary ではなく unary？
-// primary = num | ident func-args? | "(" expr ")" | "sizeof" unary
+// primary = num | str | ident func-args? | "(" expr ")" | "sizeof" unary
 Node *primary() {
     Token *tok;
 
@@ -544,6 +551,21 @@ Node *primary() {
     }
 
     tok = token;
+    if (tok->kind == TK_STR) {
+        // expect などでトークンを消費できないので直接進める
+        token = token->next;
+
+        // 文字列は char の配列
+        Type *ty = array_of(char_type(), tok->cont_len);
+        // 変数ではなくラベルを登録する
+        // ラベルはコード生成時にラベルとして使われる
+        Var *var = push_var(new_label(), ty, false);
+        var->contents = tok->contents;
+        var->cont_len = tok->cont_len;
+        // 文字列リテラルは変数として扱う
+        return new_var(var, tok);
+    }
+
     if (tok->kind != TK_NUM) {
         error_tok(tok, "expected expression");
     }
