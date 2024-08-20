@@ -139,6 +139,14 @@ void visit(Node *node) {
         // sizeof 演算子の項では値の情報そのものは不要なので削除
         node->lhs = NULL;
         return;
+    case ND_STMT_EXPR:
+        // 最後の文の型がブロック全体の型になる
+        Node *last = node->body;
+        while (last->next) {
+            last = last->next;
+        }
+        node->ty = last->ty;
+        return;
     }
 }
 

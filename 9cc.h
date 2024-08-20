@@ -99,6 +99,7 @@ typedef enum {
     ND_BLOCK,       // "{ ... }"
     ND_FUNCALL,     // 関数呼び出し
     ND_EXPR_STMT,   // Expression のみの文
+    ND_STMT_EXPR,   // ({ stmt+ }) 文を複数並べて最後の文が値になる (GNU C 拡張)
     ND_NUM,         // 整数リテラル
     ND_NULL,        // 空の文
 } NodeKind;
@@ -120,7 +121,7 @@ struct Node {
     Node *init;     // for の初期化部のコード
     Node *inc;      // for のインクリメント部のコード
 
-    Node *body;     // ブロックの中身の複数の文のコード
+    Node *body;     // ブロックもしくはステートメント式の中身の複数の文のコード
 
     char *funcname; // 関数呼び出し
     Node *args;     // 関数引数

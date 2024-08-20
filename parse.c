@@ -498,6 +498,30 @@ Node *postfix() {
     return node;
 }
 
+// stmt-expr = stmt* "}" ")"
+Node *stmt_expr(Token *tok) {
+    Node *node = new_node(ND_STMT_EXPR, tok);
+    node->body = stmt();
+    Node *cur = node->body;
+
+    // primary のほうで "(" "{" はパースしているので、stmt のパースから始めればいい
+    // 複数の statement をパースして body につなげていく
+    while (!consume("}")) {
+        cur->next = stmt();
+        cur = cur->next;
+    }
+    expect(")");
+
+    // 最後の文は値を返さないといけない
+    if (cur->kind != ND_EXPR_STMT) {
+        error_tok(cur->tok, "statement expression returning void is not supported");
+    }
+    // 最後の文の中身の式を取り出して持ち上げる
+    // 構造体の代入なので値がすべてコピーされる
+    *cur = *cur->lhs;
+    return node;
+}
+
 // func-args = "(" (assign ("," assign)*)? ")"
 Node *func_args() {
     // ただの変数か関数呼び出しかを判断するため、既に "(" は消費されている
@@ -517,11 +541,20 @@ Node *func_args() {
 }
 
 // todo: なぜ sizeof の lhs は primary ではなく unary？
-// primary = num | str | ident func-args? | "(" expr ")" | "sizeof" unary
+// primary = "(" "{" stmt-expr-tail
+//         | "(" expr ")"
+//         | "sizeof" unary
+//         | ident func-args?
+//         | str
+//         | num
 Node *primary() {
     Token *tok;
 
-    if (consume("(")) {
+    if (tok = consume("(")) {
+        if (consume("{")) {
+            return stmt_expr(tok);
+        }
+
         Node *node = expr();
         expect(")");
         return node;

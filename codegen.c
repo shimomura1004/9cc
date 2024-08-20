@@ -218,6 +218,11 @@ void gen(Node *node) {
         return;
     }
     case ND_BLOCK:
+    case ND_STMT_EXPR:
+        // stmt_expr の場合、最後のノードは必ず式になっている
+        // パースするときに expr_stmt (文) の中身(式)を取り出しているため
+        // よってそのままコード生成すれば最終的にスタックトップに最後の式の結果が残る
+        // (stmt_expr の場合はスタックトップの値を最後に捨てるようになっている)
         for (Node *n = node->body; n; n = n->next) {
             gen(n);
         }
