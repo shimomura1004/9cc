@@ -146,6 +146,57 @@ char *starts_with_reserved_ops(char *p) {
     return NULL;
 }
 
+char get_escape_char(char c) {
+    switch (c)
+    {
+    case 'a': return '\a';
+    case 'b': return '\b';
+    case 't': return '\t';
+    case 'n': return '\n';
+    case 'v': return '\v';
+    case 'f': return '\f';
+    case 'r': return '\r';
+    case 'e': return '\e';
+    case '0': return '\0';
+    default:  return c;
+    }
+}
+
+Token *read_string_literal(Token *cur, char *start) {
+    char *p = start + 1;
+    char buf[1024];
+    int len = 0;
+
+    for (;;) {
+        if (len == sizeof(buf)) {
+            // 文字列リテラルは1024文字まで
+            error_at(start, "string literal too large");
+        }
+        if (*p == '\0') {
+            // ダブルクオートがないまま末尾に達した場合
+            error_at(start, "unclosed string literal");
+        }
+        if (*p == '"') {
+            break;
+        }
+
+        if (*p == '\\') {
+            p++;
+            buf[len++] = get_escape_char(*p++);
+        }
+        else {
+            buf[len++] = *p++;
+        }
+    }
+
+    Token *tok = new_token(TK_STR, cur, start, p - start + 1);
+    tok->contents = malloc(len + 1);
+    memcpy(tok->contents, buf, len);
+    tok->contents[len] = '\0';
+    tok->cont_len = len + 1;
+    return tok;
+}
+
 // 入力文字列 p をトークナイズしてそれを返す
 Token *tokenize() {
     char *p = user_input;
@@ -188,20 +239,8 @@ Token *tokenize() {
 
         // String literal
         if (*p == '"') {
-            char *q = p++;
-            while (*p && *p != '"') {
-                p++;
-            }
-            if (!*p) {
-                // ダブルクオートがないまま末尾に達した場合
-                error_at(q, "unclosed string literal");
-            }
-            p++;
-
-            cur = new_token(TK_STR, cur, q, p - q);
-            // ダブルクオートで囲まれた中身だけコピー
-            cur->contents = strndup(q + 1, p - q - 2);
-            cur->cont_len = p - q - 1;
+            cur = read_string_literal(cur, p);
+            p += cur->len;
             continue;
         }
 
