@@ -24,6 +24,7 @@ static char *node_names[] = {
     "BLOCK",
     "FUNCALL",
     "EXPR_STMT",
+    "STMT_EXPR",
     "NUM",
     "NULL",
 };
@@ -178,6 +179,13 @@ void print_node(Node *node, int depth) {
             break;
         case ND_BLOCK:
             fprintf(stderr, "%*sBLOCK [\n", depth, " ");
+            for (Node *n = node->body; n; n = n->next) {
+                print_node(n, depth + 2);
+            }
+            fprintf(stderr, "%*s]\n", depth, " ");
+            break;
+        case ND_STMT_EXPR:
+            fprintf(stderr, "%*sSTMT_EXPR [\n", depth, " ");
             for (Node *n = node->body; n; n = n->next) {
                 print_node(n, depth + 2);
             }
