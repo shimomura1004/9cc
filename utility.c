@@ -28,6 +28,41 @@ static char *node_names[] = {
     "NULL",
 };
 
+void print_string_literal(char *str) {
+    for (int i = 0; str[i]; i++) {
+        switch (str[i])
+        {
+        case '\a':
+            fprintf(stderr, "\\a");
+            break;
+        case '\b':
+            fprintf(stderr, "\\b");
+            break;
+        case '\t':
+            fprintf(stderr, "\\t");
+            break;
+        case '\n':
+            fprintf(stderr, "\\n");
+            break;
+        case '\v':
+            fprintf(stderr, "\\v");
+            break;
+        case '\f':
+            fprintf(stderr, "\\f");
+            break;
+        case '\r':
+            fprintf(stderr, "\\r");
+            break;
+        case '\e':
+            fprintf(stderr, "\\e");
+            break;
+        default:  
+            fputc(str[i], stderr);
+            break;
+        }
+    }
+}
+
 void print_type(Type *ty) {
     if (!ty) {
         fprintf(stderr, "N/A");
@@ -97,7 +132,9 @@ void print_node(Node *node, int depth) {
             else {
                 fprintf(stderr, "%*sVAL : ", depth, " ");
                 print_type(node->ty);
-                fprintf(stderr, " = \"%s\"", node->var->contents);
+                fprintf(stderr, " = \"");
+                print_string_literal(node->var->contents);
+                fprintf(stderr, "\"");
             }
             fprintf(stderr, "\n");
             break;
