@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <stdbool.h>
 #include <assert.h>
+#include <errno.h>
 
 typedef struct Type Type;
 
@@ -56,6 +57,7 @@ struct VarList {
     Var *var;
 };
 
+extern char *filename;      // ソースコードのファイル名
 extern char *user_input;    // 入力プログラム
 extern Token *token;        // 現在見ているトークン
 

@@ -14,7 +14,9 @@ assert() {
     expected="$1"
     input="$2"
 
-    ./9cc "$input" > tmp.s
+    # <(command) は process substitution
+    # command の実行結果をファイルのように扱うことができる
+    ./9cc <(echo "$input") > tmp.s
     cc -static -o tmp tmp.s tmp2.o
     ./tmp
     actual="$?"

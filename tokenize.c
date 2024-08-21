@@ -2,6 +2,7 @@
 #include <ctype.h>
 #include "9cc.h"
 
+char *filename;
 char *user_input;
 Token *token;
 
