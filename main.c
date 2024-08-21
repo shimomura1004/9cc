@@ -2,6 +2,10 @@
 #include <string.h>
 #include "9cc.h"
 
+#ifdef DEBUG
+#include "utility.h"
+#endif
+
 char *read_file(char *path) {
     FILE *fp = fopen(path, "r");
     if (!fp) {
@@ -99,6 +103,10 @@ int main(int argc, char **argv) {
     token = tokenize();
     Program *prog = program();
     add_type(prog);
+
+#ifdef DEBUG
+    print_ast(prog);
+#endif
 
     // 各関数で使われる各ローカル変数にオフセットの情報を割り当てる
     for (Function *fn = prog->fns; fn; fn = fn->next) {
