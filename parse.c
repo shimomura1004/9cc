@@ -1,21 +1,13 @@
 #include <string.h>
 #include "9cc.h"
 
-VarList *locals;
-VarList *globals;
+VarList *locals;    // ローカル変数のリスト
+VarList *globals;   // グローバル変数のリスト
+VarList *scope;     // 今のスコープで定義されている変数のリスト
 
 // 今パースしている関数のスコープ内で定義されている変数リストの中から tok を探す
 Var *find_var(Token *tok) {
-    // まずローカル変数から探す
-    for (VarList *vl = locals; vl; vl = vl->next) {
-        Var *var = vl->var;
-        if (strlen(var->name) == tok->len && !memcmp(tok->str, var->name, tok->len)) {
-            return var;
-        }
-    }
-
-    // ローカル変数になければグローバル変数を探す
-    for (VarList *vl = globals; vl; vl = vl->next) {
+    for (VarList *vl = scope; vl; vl = vl->next) {
         Var *var = vl->var;
         if (strlen(var->name) == tok->len && !memcmp(tok->str, var->name, tok->len)) {
             return var;
@@ -76,6 +68,12 @@ Var *push_var(char *name, Type *ty, bool is_local) {
         vl->next = globals;
         globals = vl;
     }
+
+    // 新しい変数を追加したら、scope にも追加する
+    VarList *sc = calloc(1, sizeof(VarList));
+    sc->var = var;
+    sc->next = scope;
+    scope = sc;
 
     return var;
 }
@@ -348,11 +346,17 @@ Node *stmt() {
         head.next = NULL;
         Node *cur = &head;
 
+        // ブロックの中だけで有効な変数が定義されるかもしれないので
+        // 今の scope を控えておく
+        // ブロック内をパースしている間は一時的にリストが伸びることになる
+        VarList *sc = scope;
         // 中身の複数文を順番にリストに入れていく
         while (!consume("}")) {
             cur->next = stmt();
             cur = cur->next;
         }
+        // ブロック内で定義されていた変数を忘れるため、scope を戻す
+        scope = sc;
 
         Node *node = new_node(ND_BLOCK, tok);
         node->body = head.next;
@@ -500,6 +504,8 @@ Node *postfix() {
 
 // stmt-expr = stmt* "}" ")"
 Node *stmt_expr(Token *tok) {
+    VarList *sc = scope;
+
     Node *node = new_node(ND_STMT_EXPR, tok);
     node->body = stmt();
     Node *cur = node->body;
@@ -511,6 +517,8 @@ Node *stmt_expr(Token *tok) {
         cur = cur->next;
     }
     expect(")");
+
+    scope = sc;
 
     // 最後の文は値を返さないといけない
     if (cur->kind != ND_EXPR_STMT) {
