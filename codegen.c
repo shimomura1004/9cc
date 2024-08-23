@@ -67,6 +67,15 @@ void gen_addr(Node *node) {
         // 代入文の左辺にデリファレンスがあった場合
         gen(node->lhs);
         return;
+    case ND_MEMBER:
+        // 代入文の左辺に構造体メンバアクセスがあった場合
+        // 構造体のアドレスをスタックトップに置く
+        gen_addr(node->lhs);
+        printf("  pop rax\n");
+        // 構造体メンバのオフセットを追加してスタックトップに置き直す
+        printf("  add rax, %d\n", node->member->offset);
+        printf("  push rax\n");
+        return;
     }
 
     error_tok(node->tok, "not an lvalue");
@@ -228,6 +237,7 @@ void gen(Node *node) {
         }
         return;
     case ND_VAR:
+    case ND_MEMBER:
         // 指定された変数に対応するアドレスをスタックトップにいれる
         gen_addr(node);
         if (node->ty->kind != TY_ARRAY) {

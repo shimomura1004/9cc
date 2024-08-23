@@ -116,6 +116,7 @@ char *starts_with_reserved(char *p) {
         "int",
         "char",
         "sizeof",
+        "struct",
     };
 
     for (int i=0; i < sizeof(kw) / sizeof(*kw); i++) {
@@ -134,7 +135,7 @@ char *starts_with_reserved_ops(char *p) {
     static char *ops[] = {
         "==", "!=", "<=", ">=",
         "+", "-", "*", "&", "/", "(", ")", "<", ">", ";", "=", "{", "}", ",",
-        "[", "]",
+        "[", "]", ".",
     };
 
     // Multi/single-letter punctuator

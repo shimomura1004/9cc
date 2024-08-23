@@ -87,8 +87,11 @@ char *new_label() {
 
 Function *function();
 Type *basetype();
+Type *struct_decl();
+Member *struct_member();
 void global_var();
 Node *declaration();
+bool is_typename();
 Node *stmt();
 Node *expr();
 Node *assign();
@@ -138,17 +141,23 @@ Program *program() {
     return prog;
 }
 
-// basetype = ("char" | "int") "*"*
+// basetype = ("char" | "int" | struct-decl) "*"*
 // 型宣言を読み取る
 Type *basetype() {
+    if (!is_typename(token)) {
+        error_tok(token, "typename expected");
+    }
+
     Type *ty;
 
     if (consume("char")) {
         ty = char_type();
     }
-    else {
-        expect("int");
+    else if (consume("int")) {
         ty = int_type();
+    }
+    else {
+        ty = struct_decl();
     }
 
     while (consume("*")) {
@@ -167,6 +176,45 @@ Type *read_type_suffix(Type *base) {
     // さらに後ろをパースし、配列型とする
     base = read_type_suffix(base);
     return array_of(base, sz);
+}
+
+// struct-decl = "struct" "{" struct-member "}"
+Type *struct_decl() {
+    expect("struct");
+    expect("{");
+
+    Member head;
+    head.next = NULL;
+    Member *cur = &head;
+
+    while (!consume("}")) {
+        cur->next = struct_member();
+        cur = cur->next;
+    }
+
+    Type *ty = calloc(1, sizeof(Type));
+    ty->kind = TY_STRUCT;
+    ty->members = head.next;
+
+    // 構造体の各メンバに対してオフセットを計算する
+    // todo: padding?
+    int offset = 0;
+    for (Member *mem = ty->members; mem; mem = mem->next) {
+        mem->offset = offset;
+        offset += size_of(mem->ty);
+    }
+
+    return ty;
+}
+
+// struct-member = basetype ident ("[" num "]")* ";"
+Member *struct_member() {
+    Member *mem = calloc(1, sizeof(Member));
+    mem->ty = basetype();
+    mem->name = expect_ident();
+    mem->ty = read_type_suffix(mem->ty);
+    expect(";");
+    return mem;
 }
 
 // 関数引数の宣言を1つ分読み取る
@@ -268,7 +316,7 @@ Node *declaration() {
 }
 
 bool is_typename() {
-    return peek("char") || peek("int");
+    return peek("char") || peek("int") || peek("struct");
 }
 
 Node *read_expr_stmt() {
@@ -488,18 +536,29 @@ Node *unary() {
     return postfix();
 }
 
-// postfix = primary ( "[" expr "]" )*
+// postfix = primary ( "[" expr "]" | "." ident)*
 Node *postfix() {
     Node *node = primary();
     Token *tok;
 
-    while (tok = consume("[")) {
-        // x[y] は *(x+y) と同じ
-        Node *exp = new_binary(ND_ADD, node, expr(), tok);
-        expect("]");
-        node = new_unary(ND_DEREF, exp, tok);
+    for (;;) {
+        if (tok = consume("[")) {
+            // x[y] は *(x+y) と同じ
+            Node *exp = new_binary(ND_ADD, node, expr(), tok);
+            expect("]");
+            node = new_unary(ND_DEREF, exp, tok);
+            continue;
+        }
+
+        // 構造体のメンバアクセス時は member_name にメンバ名を入れる
+        if (tok = consume(".")) {
+            node = new_unary(ND_MEMBER, node, tok);
+            node->member_name = expect_ident();
+            continue;
+        }
+
+        return node;
     }
-    return node;
 }
 
 // stmt-expr = stmt* "}" ")"

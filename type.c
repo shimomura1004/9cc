@@ -1,3 +1,4 @@
+#include <string.h>
 #include "9cc.h"
 
 // 型情報を malloc して返す
@@ -38,10 +39,28 @@ int size_of(Type *ty) {
     case TY_INT:
     case TY_PTR:
         return 8;
-    default:
-        assert(ty->kind == TY_ARRAY);
+    case TY_ARRAY:
         return size_of(ty->base) * ty->array_size;
+    default:
+        assert(ty->kind == TY_STRUCT);
+        Member *mem = ty->members;
+        while (mem->next) {
+            mem = mem->next;
+        }
+        // 最後のメンバのオフセットに、最後のメンバのサイズを足す
+        return mem->offset + size_of(mem->ty);
     }
+}
+
+// 構造体型から指定された名前のメンバを探す
+Member *find_member(Type *ty, char *name) {
+    assert(ty->kind == TY_STRUCT);
+    for (Member *mem = ty->members; mem; mem = mem->next) {
+        if (!strcmp(mem->name, name)) {
+            return mem;
+        }
+    }
+    return NULL;
 }
 
 // 子要素を含めノードに型をつける
@@ -108,6 +127,17 @@ void visit(Node *node) {
     case ND_ASSIGN:
         node->ty = node->lhs->ty;
         return;
+    case ND_MEMBER: {
+        // 構造体のメンバアクセスのノードの型をつける
+        // 構造体以外のノードにメンバアクセスしようとしていたらエラー
+        if (node->lhs->ty->kind != TY_STRUCT) {
+            error_tok(node->tok, "not a struct");
+        }
+        // アクセスするメンバの型がこのノードの型になる
+        node->member = find_member(node->lhs->ty, node->member_name);
+        node->ty = node->member->ty;
+        return;
+    }
     case ND_ADDR:
         if (node->lhs->ty->kind == TY_ARRAY) {
             // 配列変数への & は、配列の中身の型へのポインタ型になる

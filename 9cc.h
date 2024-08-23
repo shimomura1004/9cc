@@ -8,6 +8,7 @@
 #include <errno.h>
 
 typedef struct Type Type;
+typedef struct Member Member;
 
 //
 // Tokenizer
@@ -86,6 +87,7 @@ typedef enum {
     ND_MUL,         // *
     ND_DIV,         // /
     ND_ASSIGN,      // =
+    ND_MEMBER,      // . 構造体のメンバアクセス
     ND_ADDR,        // 単項 &
     ND_DEREF,       // 単項 *
     ND_VAR,         // 変数
@@ -109,27 +111,30 @@ typedef enum {
 // AST のノードの型
 typedef struct Node Node;
 struct Node {
-    NodeKind kind;  // ノードの型
-    Node *next;     // 次のノード
-    Type *ty;       // 型情報 (int か *int)
-    Token *tok;     // エラーメッセージ用に対応するトークンを保持
+    NodeKind kind;      // ノードの型
+    Node *next;         // 次のノード
+    Type *ty;           // 型情報 (int か *int)
+    Token *tok;         // エラーメッセージ用に対応するトークンを保持
 
-    Node *lhs;      // 左辺
-    Node *rhs;      // 右辺
+    Node *lhs;          // 左辺
+    Node *rhs;          // 右辺
 
-    Node *cond;     // 条件文
-    Node *then;     // 真の場合のコード、もしくは for/while のループ本体のコード
-    Node *els;      // 偽の場合のコード
-    Node *init;     // for の初期化部のコード
-    Node *inc;      // for のインクリメント部のコード
+    Node *cond;         // 条件文
+    Node *then;         // 真の場合のコード、もしくは for/while のループ本体のコード
+    Node *els;          // 偽の場合のコード
+    Node *init;         // for の初期化部のコード
+    Node *inc;          // for のインクリメント部のコード
 
-    Node *body;     // ブロックもしくはステートメント式の中身の複数の文のコード
+    Node *body;         // ブロックもしくはステートメント式の中身の複数の文のコード
 
-    char *funcname; // 関数呼び出し
-    Node *args;     // 関数引数
+    char *member_name;  // 構造体メンバへのアクセス時に使う
+    Member *member;     // 構造体のメンバ一覧 (構造体定義のときに使う)
 
-    Var *var;       // kind が ND_VAR の場合のみ使う
-    int val;        // kind が ND_NUM の場合のみ使う
+    char *funcname;     // 関数呼び出し
+    Node *args;         // 関数引数
+
+    Var *var;           // kind が ND_VAR の場合のみ使う
+    int val;            // kind が ND_NUM の場合のみ使う
 };
 
 // 関数の情報を保持する構造体
@@ -162,12 +167,21 @@ typedef enum {
     TY_INT,
     TY_PTR,
     TY_ARRAY,
+    TY_STRUCT,
 } TypeKind;
 
 struct Type {
     TypeKind kind;
     Type *base;
     int array_size;
+    Member *members;
+};
+
+struct Member {
+    Member *next;
+    Type *ty;
+    char *name;
+    int offset;
 };
 
 Type *char_type();
