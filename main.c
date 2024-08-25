@@ -87,11 +87,6 @@ void error_tok(Token *tok, char *fmt, ...) {
     exit(1);
 }
 
-// 数値 n を、次の align の倍数に切り上げる
-int align_to(int n, int align) {
-    return (n + align - 1) & ~(align - 1);
-}
-
 int main(int argc, char **argv) {
     if (argc != 2) {
         error("Wrong number of arguments\n");

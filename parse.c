@@ -197,11 +197,21 @@ Type *struct_decl() {
     ty->members = head.next;
 
     // 構造体の各メンバに対してオフセットを計算する
-    // todo: padding?
     int offset = 0;
     for (Member *mem = ty->members; mem; mem = mem->next) {
+        // アライメントを調整したオフセットを計算
+        // C の構造体では、変数のサイズの倍数の境界に合わせて配置する必要がある
+        // よってメンバの型のサイズの倍数の位置に合わせる
+        offset = align_to(offset, mem->ty->align);
         mem->offset = offset;
         offset += size_of(mem->ty);
+
+        // 構造体自身のアラインメントは、メンバの最大サイズになる
+        // 構造体が配列になったときへの対応のため、
+        // 最後のメンバの後ろにパディングが入ることもある
+        if (ty->align < mem->ty->align) {
+            ty->align = mem->ty->align;
+        }
     }
 
     return ty;

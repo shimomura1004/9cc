@@ -1,31 +1,43 @@
 #include <string.h>
 #include "9cc.h"
 
+// 数値 n を、次の align の倍数に切り上げる
+int align_to(int n, int align) {
+    // e.g. align_to(10, 8) = (10 + 8 - 1) & ~(8 - 1)
+    //                      = 17 & ~(7)
+    //                      = 0b0001_0001 & ~0b0000_0111
+    //                      = 0b0001_0001 &  0b1111_1000
+    //                      = 0b0001_0000
+    //                      = 16
+    return (n + align - 1) & ~(align - 1);
+}
+
 // 型情報を malloc して返す
-Type *new_type(TypeKind kind) {
+Type *new_type(TypeKind kind, int align) {
     Type *ty = calloc(1, sizeof(Type));
     ty->kind = kind;
+    ty->align = align;
     return ty;
 }
 
 Type *char_type() {
-    return new_type(TY_CHAR);
+    return new_type(TY_CHAR, 1);
 }
 
 Type *int_type() {
-    return new_type(TY_INT);
+    return new_type(TY_INT, 8);
 }
 
 // ベースの型情報を受取り、ポインタ型としてラップして返す
 Type *pointer_to(Type *base) {
-    Type *ty = new_type(TY_PTR);
+    Type *ty = new_type(TY_PTR, 8);
     ty->base = base;
     return ty;
 }
 
 // ベースとなる型を配列型にラップする
 Type *array_of(Type *base, int size) {
-    Type *ty = new_type(TY_ARRAY);
+    Type *ty = new_type(TY_ARRAY, base->align);
     ty->base = base;
     ty->array_size = size;
     return ty;
@@ -48,7 +60,10 @@ int size_of(Type *ty) {
             mem = mem->next;
         }
         // 最後のメンバのオフセットに、最後のメンバのサイズを足す
-        return mem->offset + size_of(mem->ty);
+        int end = mem->offset + size_of(mem->ty);
+        // 構造体自体の align には、メンバの中で最大の値が入っている
+        // 最後のメンバのあとにもパディングが入る可能性がある
+        return align_to(end, ty->align);
     }
 }
 
