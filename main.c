@@ -108,6 +108,8 @@ int main(int argc, char **argv) {
         int offset = 0;
         for (VarList *vl = fn->locals; vl; vl = vl->next) {
             Var *var = vl->var;
+            // 今から追加したい変数のサイズに応じて、必要ならパディングを追加
+            offset = align_to(offset, var->ty->align);
             offset += size_of(var->ty);
             var->offset = offset;
         }
