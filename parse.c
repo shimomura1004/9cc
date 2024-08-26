@@ -1,9 +1,18 @@
 #include <string.h>
 #include "9cc.h"
 
-VarList *locals;    // ローカル変数のリスト
-VarList *globals;   // グローバル変数のリスト
-VarList *scope;     // 今のスコープで定義されている変数のリスト
+typedef struct TagScope TagScope;
+struct TagScope {
+    TagScope *next;
+    char *name;
+    Type *ty;
+};
+
+VarList *globals;       // グローバル変数のリスト
+VarList *locals;        // ローカル変数のリスト
+
+VarList *scope;         // 今のスコープで定義されている変数のリスト
+TagScope *tag_scope;    // 今のスコープで定義されているタグのリスト
 
 // 今パースしている関数のスコープ内で定義されている変数リストの中から tok を探す
 Var *find_var(Token *tok) {
@@ -11,6 +20,17 @@ Var *find_var(Token *tok) {
         Var *var = vl->var;
         if (strlen(var->name) == tok->len && !memcmp(tok->str, var->name, tok->len)) {
             return var;
+        }
+    }
+
+    return NULL;
+}
+
+// 今パースしている関数のスコープ内で定義されているタグリストの中から tok を探す
+TagScope *find_tag(Token *tok) {
+    for (TagScope *sc = tag_scope; sc; sc = sc->next) {
+        if (strlen(sc->name) == tok->len && !memcmp(tok->str, sc->name, tok->len)) {
+            return sc;
         }
     }
 
@@ -178,15 +198,41 @@ Type *read_type_suffix(Type *base) {
     return array_of(base, sz);
 }
 
-// struct-decl = "struct" "{" struct-member "}"
+void push_tag_scope(Token *tok, Type *ty) {
+    TagScope *sc = calloc(1, sizeof(TagScope));
+    sc->next = tag_scope;
+    sc->name = strndup(tok->str, tok->len);
+    sc->ty = ty;
+    tag_scope = sc;
+}
+
+// struct-decl = "struct" ident
+//             | "struct" "{" struct-member "}"
 Type *struct_decl() {
     expect("struct");
+
+    // "struct" のあとに識別子があり次のトークンが "{" でなければ struct tag
+    // e.g. struct Position p;
+    Token *tag = consume_ident();
+    if (tag && !peek("{")) {
+        TagScope *sc = find_tag(tag);
+        if (!sc) {
+            error_tok(tag, "unknown struct type");
+        }
+        return sc->ty;
+    }
+
+    // "struct" のあとに識別子がなかった、もしくは識別子の次のトークンが
+    //  "{" の場合は、構造体の定義
+    // e.g. struct { int x; int y; }
+    //      struct Position { int x; int y; }
     expect("{");
 
     Member head;
     head.next = NULL;
     Member *cur = &head;
 
+    // メンバの定義をパース
     while (!consume("}")) {
         cur->next = struct_member();
         cur = cur->next;
@@ -214,6 +260,12 @@ Type *struct_decl() {
         }
     }
 
+    // 構造体名(タグ)が宣言されていた場合はタグリストに登録する
+    // struct Position { int x; int y; }
+    // のとき、{int x; int y;} という構造体型を Position というタグで登録する
+    if (tag) {
+        push_tag_scope(tag, ty);
+    }
     return ty;
 }
 
@@ -304,9 +356,17 @@ void global_var() {
 }
 
 // declaration = basetype ident ("[" num "]")* ("=" expr)? ";"
+//             | basetype ";"
 Node *declaration() {
     Token *tok = token;
     Type *ty = basetype();
+
+    // 型の定義だけあり変数がない場合は、構造体のタグ登録だけを意図している
+    // basetype によるパースで型が登録され目的を達成しているので NULL ノードにする
+    if (consume(";")) {
+        return new_node(ND_NULL, tok);
+    }
+
     char *name = expect_ident();
     ty = read_type_suffix(ty);
     Var *var = push_var(name, ty, true);
@@ -407,14 +467,16 @@ Node *stmt() {
         // ブロックの中だけで有効な変数が定義されるかもしれないので
         // 今の scope を控えておく
         // ブロック内をパースしている間は一時的にリストが伸びることになる
-        VarList *sc = scope;
+        VarList *sc1 = scope;
+        TagScope *sc2 = tag_scope;
         // 中身の複数文を順番にリストに入れていく
         while (!consume("}")) {
             cur->next = stmt();
             cur = cur->next;
         }
         // ブロック内で定義されていた変数を忘れるため、scope を戻す
-        scope = sc;
+        scope = sc1;
+        tag_scope = sc2;
 
         Node *node = new_node(ND_BLOCK, tok);
         node->body = head.next;
@@ -573,7 +635,8 @@ Node *postfix() {
 
 // stmt-expr = stmt* "}" ")"
 Node *stmt_expr(Token *tok) {
-    VarList *sc = scope;
+    VarList *sc1 = scope;
+    TagScope *sc2 = tag_scope;
 
     Node *node = new_node(ND_STMT_EXPR, tok);
     node->body = stmt();
@@ -587,7 +650,8 @@ Node *stmt_expr(Token *tok) {
     }
     expect(")");
 
-    scope = sc;
+    scope = sc1;
+    tag_scope = sc2;
 
     // 最後の文は値を返さないといけない
     if (cur->kind != ND_EXPR_STMT) {
