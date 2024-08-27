@@ -9,22 +9,31 @@ static int labelseq = 0;
 static char *funcname;
 
 // System V AMD64 ABI で、関数呼び出し時の引数を指定するのに使うレジスタ
-char *argreg1[] = { "dil", "sil", "dl", "cl", "r8b", "r9b" };
-char *argreg8[] = { "rdi", "rsi", "rdx", "rcx", "r8", "r9" };
+char *argreg1[] = { "dil", "sil",  "dl",  "cl", "r8b", "r9b" };
+char *argreg4[] = { "edi", "esi", "edx", "ecx", "r8d", "r9d" };
+char *argreg8[] = { "rdi", "rsi", "rdx", "rcx",  "r8", "r9" };
 
 // スタックトップにアドレスが入っている前提で
 // アドレスを取り出し、代わりにアドレスが指す値をスタックトップにいれる
 // x86 では扱うデータのバイト数によってレジスタが異なる
 void load(Type *ty) {
     printf("  pop rax\n");
-    if (size_of(ty) == 1) {
+
+    int sz = size_of(ty);
+    if (sz == 1) {
         // rax が指すアドレスから1バイト読んで rax にいれる
         printf("  movsx rax, byte ptr [rax]\n");
     }
+    else if (sz == 4) {
+        // rax が指すアドレスから4バイト読んで rax にいれる
+        printf("  movsxd rax, dword ptr [rax]\n");
+    }
     else {
+        assert(sz == 8);
         // rax が指すアドレスから8バイト読んで rax にいれる
         printf("  mov rax, [rax]\n");
     }
+
     printf("  push rax\n");
 }
 
@@ -35,14 +44,21 @@ void store(Type *ty) {
     printf("  pop rdi\n");
     // 左辺の変数のアドレスを rax に取り出し
     printf("  pop rax\n");
+
+    int sz = size_of(ty);
     // 左辺の変数のメモリ領域に右辺の計算結果を入れる
-    if (size_of(ty) == 1) {
+    if (sz == 1) {
         // dil は rdi の最下位1バイト
         printf("  mov [rax], dil\n");
     }
+    else if (sz == 4) {
+        printf("  mov [rax], edi\n");
+    }
     else {
+        assert(sz == 8);
         printf("  mov [rax], rdi\n");
     }
+
     // 代入式は右辺の値を返すので、再び rdi をスタックトップにいれる
     printf("  push rdi\n");
 }
@@ -360,6 +376,9 @@ void load_arg(Var *var, int idx) {
     int sz = size_of(var->ty);
     if (sz == 1) {
         printf("  mov [rbp-%d], %s\n", var->offset, argreg1[idx]);
+    }
+    else if (sz == 4) {
+        printf("  mov [rbp-%d], %s\n", var->offset, argreg4[idx]);
     }
     else {
         assert(sz == 8);
