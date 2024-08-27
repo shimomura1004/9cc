@@ -212,7 +212,7 @@ Type *struct_decl() {
     expect("struct");
 
     // "struct" のあとに識別子があり次のトークンが "{" でなければ struct tag
-    // e.g. struct Position p;
+    // e.g., struct Position p;
     Token *tag = consume_ident();
     if (tag && !peek("{")) {
         TagScope *sc = find_tag(tag);
@@ -224,7 +224,7 @@ Type *struct_decl() {
 
     // "struct" のあとに識別子がなかった、もしくは識別子の次のトークンが
     //  "{" の場合は、構造体の定義
-    // e.g. struct { int x; int y; }
+    // e.g., struct { int x; int y; }
     //      struct Position { int x; int y; }
     expect("{");
 
@@ -280,7 +280,7 @@ Member *struct_member() {
 }
 
 // 関数引数の宣言を1つ分読み取る
-// e.g. "int *x[10]"
+// e.g., "int *x[10]"
 VarList *read_func_param() {
     Type *ty = basetype();
     char *name = expect_ident();
@@ -608,7 +608,7 @@ Node *unary() {
     return postfix();
 }
 
-// postfix = primary ( "[" expr "]" | "." ident)*
+// postfix = primary ( "[" expr "]" | "." ident | "->" ident)*
 Node *postfix() {
     Node *node = primary();
     Token *tok;
@@ -624,6 +624,15 @@ Node *postfix() {
 
         // 構造体のメンバアクセス時は member_name にメンバ名を入れる
         if (tok = consume(".")) {
+            node = new_unary(ND_MEMBER, node, tok);
+            node->member_name = expect_ident();
+            continue;
+        }
+
+        // アロー演算子は、ポインタを deref した上でメンバアクセスする
+        // e.g., pos->x == (*pos).x
+        if (tok = consume("->")) {
+            node = new_unary(ND_DEREF, node, tok);
             node = new_unary(ND_MEMBER, node, tok);
             node->member_name = expect_ident();
             continue;
