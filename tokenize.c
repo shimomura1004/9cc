@@ -117,6 +117,7 @@ char *starts_with_reserved(char *p) {
         "char",
         "sizeof",
         "struct",
+        "typedef",
     };
 
     for (int i=0; i < sizeof(kw) / sizeof(*kw); i++) {
