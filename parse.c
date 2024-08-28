@@ -187,7 +187,7 @@ Program *program() {
     return prog;
 }
 
-// basetype = ("char" | "int" | struct-decl | typedef-name) "*"*
+// basetype = ("char" | "short" | "int" | "long" | struct-decl | typedef-name) "*"*
 // 型宣言を読み取る
 Type *basetype() {
     if (!is_typename(token)) {
@@ -199,8 +199,14 @@ Type *basetype() {
     if (consume("char")) {
         ty = char_type();
     }
+    else if (consume("short")) {
+        ty = short_type();
+    }
     else if (consume("int")) {
         ty = int_type();
+    }
+    else if (consume("long")) {
+        ty = long_type();
     }
     else if (consume("struct")) {
         ty = struct_decl();
@@ -416,7 +422,8 @@ Node *declaration() {
 }
 
 bool is_typename() {
-    return peek("char") || peek("int") || peek("struct") || find_typedef(token);
+    return peek("char") || peek("short") || peek("int") || peek("long") ||
+           peek("struct") || find_typedef(token);
 }
 
 Node *read_expr_stmt() {
