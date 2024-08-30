@@ -98,16 +98,18 @@ Var *push_var(char *name, Type *ty, bool is_local) {
     vl->var = var;
 
     // ローカル変数かグローバル変数かで追加するリストを変える
+    // 関数宣言は変数のスコープには入れない
     if (is_local) {
         vl->next = locals;
         locals = vl;
     }
-    else {
+    else if (ty->kind != TY_FUNC) {
         vl->next = globals;
         globals = vl;
     }
 
     // 新しい変数を追加したら、scope にも追加する
+    // こちらは関数も登録される
     VarScope *sc = push_scope(name);
     sc->var = var;
 
@@ -384,7 +386,10 @@ Function *function() {
 
     Type *ty = type_specifier();
     char *name = NULL;
-    declarator(ty, &name);
+    ty = declarator(ty, &name);
+
+    // 関数の名前と型の組み合わせをスコープに追加する
+    push_var(name, func_type(ty), false);
 
     Function *fn = calloc(1, sizeof(Function));
     fn->name = name;
@@ -804,6 +809,22 @@ Node *primary() {
             node->funcname = strndup(tok->str, tok->len);
             // 関数呼び出し時の引数をパース
             node->args = func_args();
+
+            // 関数定義を探す
+            VarScope *sc = find_var(tok);
+            if (sc) {
+                // 関数ではなかったらエラー
+                if (!sc->var || sc->var->ty->kind != TY_FUNC) {
+                    error_tok(tok, "not a function");
+                }
+                // 関数呼び出しの場合、関数呼び出しの結果の型は、関数の戻り値の型
+                node->ty = sc->var->ty->return_ty;
+            }
+            else {
+                // C では型宣言がないときのデフォルトの型は int
+                node->ty = int_type();
+            }
+
             return node;
         }
 
