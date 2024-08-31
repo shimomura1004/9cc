@@ -120,6 +120,7 @@ char *starts_with_reserved(char *p) {
         "typedef",
         "short",
         "long",
+        "void",
     };
 
     for (int i=0; i < sizeof(kw) / sizeof(*kw); i++) {

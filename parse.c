@@ -194,14 +194,17 @@ Program *program() {
 }
 
 // type-specifier = builtin-type | struct-decl | typedef-name
-// buildin-type = "char" | "short" | "int" | "long"
+// buildin-type = "void" | "char" | "short" | "int" | "long"
 // 型宣言を読み取る
 Type *type_specifier() {
     if (!is_typename(token)) {
         error_tok(token, "typename expected");
     }
 
-    if (consume("char")) {
+    if (consume("void")) {
+        return void_type();
+    }
+    else if (consume("char")) {
         return char_type();
     }
     else if (consume("short")) {
@@ -442,6 +445,13 @@ Node *declaration() {
     char *name = NULL;
     ty = declarator(ty, &name);
     ty = type_suffix(ty);
+
+    if (ty->kind == TY_VOID) {
+        // void 型の変数は宣言できない
+        // todo: まだ戻り値のない関数(void 関数)は扱えない
+        error_tok(tok, "variable declared void");
+    }
+
     Var *var = push_var(name, ty, true);
 
     // 初期値のない変数宣言はからっぽの文になる
@@ -459,7 +469,8 @@ Node *declaration() {
 }
 
 bool is_typename() {
-    return peek("char") || peek("short") || peek("int") || peek("long") ||
+    return peek("void") || 
+           peek("char") || peek("short") || peek("int") || peek("long") ||
            peek("struct") || find_typedef(token);
 }
 
