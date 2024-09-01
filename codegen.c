@@ -49,6 +49,17 @@ void store(Type *ty) {
     // 左辺の変数のアドレスを rax に取り出し
     printf("  pop rax\n");
 
+    // C ではブールはゼロか非ゼロかだけで判定するが
+    // 処理のしやすさのためここで 0 か 1 に丸める
+    if (ty->kind == TY_BOOL) {
+        // cmp は eflag レジスタの ZF(zero flag) ビットを更新する
+        printf("  cmp rdi, 0\n");
+        // ZF が1でないとき(rdi と 0 が等しくないとき) dil を1にする
+        printf("  setne dil\n");
+        // dil は1バイトなので movzb で rdi(8バイト)に拡張する
+        printf("  movzb rdi, dil\n");
+    }
+
     int sz = size_of(ty);
     // 左辺の変数のメモリ領域に右辺の計算結果を入れる
     if (sz == 1) {

@@ -194,7 +194,7 @@ Program *program() {
 }
 
 // type-specifier = builtin-type | struct-decl | typedef-name
-// buildin-type = "void" | "char" | "short" | "int" | "long"
+// buildin-type = "void" | "_Bool" | "char" | "short" | "int" | "long"
 // 型宣言を読み取る
 Type *type_specifier() {
     if (!is_typename(token)) {
@@ -203,6 +203,9 @@ Type *type_specifier() {
 
     if (consume("void")) {
         return void_type();
+    }
+    else if (consume("_Bool")) {
+        return bool_type();
     }
     else if (consume("char")) {
         return char_type();
@@ -469,7 +472,7 @@ Node *declaration() {
 }
 
 bool is_typename() {
-    return peek("void") || 
+    return peek("void") || peek("_Bool") ||
            peek("char") || peek("short") || peek("int") || peek("long") ||
            peek("struct") || find_typedef(token);
 }
