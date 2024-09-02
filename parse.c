@@ -136,7 +136,9 @@ char *new_label() {
 Function *function();
 Type *type_specifier();
 Type *declarator(Type *ty, char **name);
+Type *abstract_declarator(Type *ty);
 Type *type_suffix(Type *ty);
+Type *type_name();
 Type *struct_decl();
 Member *struct_member();
 void global_var();
@@ -314,6 +316,7 @@ Type *type_specifier() {
 }
 
 // declarator = "*"* ( "(" declarator ")" | ident )
+// 型の記述と、その型を持つ識別子のセットをパース
 Type *declarator(Type *ty, char **name) {
     // 1. int *x -> pointer_to(int)
     // 2. int *x[3] -> array_of(pointer_to(int))
@@ -342,6 +345,25 @@ Type *declarator(Type *ty, char **name) {
     return type_suffix(ty);
 }
 
+// abstract-declarator = "*"* ( "(" abstract-declarator ")" )? type-suffix
+// 識別子のない型の記述をパース
+Type *abstract_declarator(Type *ty) {
+    while (consume("*")) {
+        ty = pointer_to(ty);
+    }
+
+    if (consume("(")) {
+        Type *placeholder = calloc(1, sizeof(Type));
+        Type *new_ty = abstract_declarator(placeholder);
+        expect(")");
+        // 後ろの配列宣言のところまでパースしたあと、プレースホルダを差し替え
+        *placeholder = *type_suffix(ty);
+        return new_ty;
+    }
+
+    return type_suffix(ty);
+}
+
 // type-suffix = ( "[" num "]" type-suffix)?
 // 型の後置修飾語(配列の括弧)をパース
 Type *type_suffix(Type *ty) {
@@ -353,6 +375,15 @@ Type *type_suffix(Type *ty) {
     // さらに後ろをパースし、配列型とする
     ty = type_suffix(ty);
     return array_of(ty, sz);
+}
+
+// type-name = type-specifier abstract-declarator type-suffix
+// type-declarator ではなく abstract-declarator になっている
+// 識別子なしの型宣言部だけを
+Type *type_name() {
+    Type *ty = type_specifier();
+    ty = abstract_declarator(ty);
+    return type_suffix(ty);
 }
 
 void push_tag_scope(Token *tok, Type *ty) {
@@ -880,6 +911,7 @@ Node *func_args() {
 // todo: なぜ sizeof の lhs は primary ではなく unary？
 // primary = "(" "{" stmt-expr-tail
 //         | "(" expr ")"
+//         | "sizeof" "(" type-name ")"
 //         | "sizeof" unary
 //         | ident func-args?
 //         | str
@@ -898,6 +930,18 @@ Node *primary() {
     }
 
     if (tok = consume("sizeof")) {
+        // 型名への sizeof には括弧が必須
+        if (consume("(")) {
+            if (is_typename()) {
+                Type *ty = type_name();
+                expect(")");
+                return new_num(size_of(ty), tok);
+            }
+            // この時点で tok は sizeof を指しているの
+            // next は開き括弧から始まる unary と思われるトークンを指す
+            token = tok->next;
+        }
+        // 型名への sizeof には括弧が必須なので、括弧がない場合は unary
         return new_unary(ND_SIZEOF, unary(), tok);
     }
 
