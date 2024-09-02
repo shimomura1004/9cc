@@ -177,6 +177,7 @@ typedef enum {
 
 struct Type {
     TypeKind kind;
+    bool is_typedef;
     int align;
     Type *base;
     int array_size;
