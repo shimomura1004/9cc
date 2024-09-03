@@ -105,6 +105,7 @@ typedef enum {
     ND_EXPR_STMT,   // Expression のみの文
     ND_STMT_EXPR,   // ({ stmt+ }) 文を複数並べて最後の文が値になる (GNU C 拡張)
     ND_NUM,         // 整数リテラル
+    ND_CAST,        // キャスト
     ND_NULL,        // 空の文
 } NodeKind;
 

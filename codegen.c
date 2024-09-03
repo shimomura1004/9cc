@@ -81,6 +81,31 @@ void store(Type *ty) {
     printf("  push rdi\n");
 }
 
+// スタックトップの値を取り出して、指定された型に丸める
+void truncate(Type *ty) {
+    printf("  pop rax\n");
+
+    if (ty->kind == TY_BOOL) {
+        // bool へのキャストの場合、単に 0 と比較して、0  じゃなかったら 1 をセットする　
+        printf("  cmp rax, 0\n");
+        printf("  setne al\n");
+    }
+
+    int sz = size_of(ty);
+    if (sz == 1) {
+        printf("  movsx rax, al\n");
+    }
+    else if (sz == 2) {
+        printf("  movsx eax, ax\n");
+    }
+    else if (sz == 4) {
+        printf("  movsxd rax, eax\n");
+    }
+
+    // 最後にスタックトップに値を戻す
+    printf("  push rax\n");
+}
+
 // 変数のオフセットを計算してスタックトップに置く
 void gen_addr(Node *node) {
     switch (node->kind) {
@@ -310,6 +335,11 @@ void gen(Node *node) {
             // その場合はこの node の型が配列ではなく var になるので問題ない
             load(node->ty);
         }
+        return;
+    case ND_CAST:
+        // 普通に計算するコードを出力したあと truncate する　
+        gen(node->lhs);
+        truncate(node->ty);
         return;
     }
 
