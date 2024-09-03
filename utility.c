@@ -206,7 +206,7 @@ void print_node(Node *node, int depth) {
         case ND_NUM:
             fprintf(stderr, "%*sNUM : ", depth, " ");
             print_type(node->ty);
-            fprintf(stderr, " = %d\n", node->val);
+            fprintf(stderr, " = %ld\n", node->val);
             break;
         case ND_NULL:
             fprintf(stderr, "%*sNULL\n", depth, " ");

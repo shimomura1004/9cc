@@ -138,8 +138,16 @@ void visit(Node *node) {
     case ND_NE:
     case ND_LT:
     case ND_LE:
-    case ND_NUM:
         node->ty = int_type();
+        return;
+    case ND_NUM:
+        // int(4バイト)に収まらない場合は long にする
+        if (node->val == (int)node->val) {
+            node->ty = int_type();
+        }
+        else {
+            node->ty = long_type();
+        }
         return;
     case ND_VAR:
         node->ty = node->var->ty;

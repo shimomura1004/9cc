@@ -57,11 +57,11 @@ void expect(char *s) {
 
 // 次のトークンが数値の場合、トークンをひとつ読み進めてその数値を返す
 // それ以外の場合はエラーを報告する
-long int expect_number() {
+long expect_number() {
     if (token->kind != TK_NUM) {
         error_tok(token, "expected a number");
     }
-    int val = token->val;
+    long val = token->val;
     token = token->next;
     return val;
 }
