@@ -182,12 +182,16 @@ Program *program() {
     // プログラムは、グローバル変数の宣言か関数定義が複数並んだもの
     while (!at_eof()) {
         if (is_function()) {
-            cur->next = function();
+            Function *fn = function();
+            if (!fn) {
+                continue;
+            }
+            cur->next = fn;
             cur = cur->next;
+            continue;
         }
-        else {
-            global_var();
-        }
+
+        global_var();
     }
 
     Program *prog = calloc(1, sizeof(Program));
@@ -504,7 +508,7 @@ VarList *read_func_params() {
     return head;
 }
 
-// function = type-specifier declarator "(" params? ")" "{" stmt* "}"
+// function = type-specifier declarator "(" params? ")" ( "{" stmt* "}" | ";")
 // params   = param ("," param)*
 // param    = type-specifier declarator type-suffix
 Function *function() {
@@ -523,8 +527,13 @@ Function *function() {
 
     expect("(");
     fn->params = read_func_params();
-    expect("{");
 
+    if (consume(";")) {
+        return NULL;
+    }
+
+    // 関数の本体をパース
+    expect("{");
     Node head;
     head.next = NULL;
     Node *cur = &head;

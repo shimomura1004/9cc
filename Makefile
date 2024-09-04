@@ -9,7 +9,8 @@ $(OBJS): 9cc.h utility.h
 
 test: 9cc
 	./9cc tests > tmp.s
-	cc -static -o tmp tmp.s
+	echo 'int char_fn() { return 257; }' | cc -xc -c -o tmp2.o -
+	cc -static -o tmp tmp.s tmp2.o
 	./tmp
 
 clean:
