@@ -81,7 +81,7 @@ void store(Type *ty) {
     printf("  push rdi\n");
 }
 
-// スタックトップの値を取り出して、指定された型に丸める
+// スタックから値を取り出して、指定された型に丸めて、スタックに戻す
 void truncate(Type *ty) {
     printf("  pop rax\n");
 
@@ -212,6 +212,9 @@ void gen(Node *node) {
         // 戻り値は rax に入って戻って来る
         // 関数呼び出しの結果は関数の戻り値なので、それをスタックトップにいれる
         printf("  push rax\n");
+
+        // 関数の戻り値の型に合わせて丸める
+        truncate(node->ty);
         return;
     }
     case ND_RETURN:
