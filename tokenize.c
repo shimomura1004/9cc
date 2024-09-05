@@ -123,6 +123,7 @@ char *starts_with_reserved(char *p) {
         "void",
         "_Bool",
         "enum",
+        "static",
     };
 
     for (int i=0; i < sizeof(kw) / sizeof(*kw); i++) {

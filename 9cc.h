@@ -180,6 +180,7 @@ typedef enum {
 struct Type {
     TypeKind kind;
     bool is_typedef;
+    bool is_static;
     int align;
     Type *base;
     int array_size;

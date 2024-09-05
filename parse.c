@@ -110,11 +110,6 @@ Var *push_var(char *name, Type *ty, bool is_local) {
         globals = vl;
     }
 
-    // 新しい変数を追加したら、scope にも追加する
-    // こちらは関数も登録される
-    VarScope *sc = push_scope(name);
-    sc->var = var;
-
     return var;
 }
 
@@ -212,7 +207,7 @@ Program *program() {
 //              | "short" | "short" "int" | "int" "short"
 //              | "int"
 //              | "long" | "long" "int" | "int" "long"
-// "typedef" は type-specifier 内のどこにでも現れる
+// "typedef" と "static" は type-specifier 内のどこにでも現れる
 // 型宣言を読み取る
 Type *type_specifier() {
     if (!is_typename(token)) {
@@ -238,12 +233,16 @@ Type *type_specifier() {
     Type *user_type = NULL;
 
     bool is_typedef = false;
+    bool is_static = false;
 
     for (;;) {
         Token *tok = token;
 
         if (consume("typedef")) {
             is_typedef = true;
+        }
+        else if (consume("static")) {
+            is_static = true;
         }
         else if (consume("void")) {
             base_type += VOID;
@@ -329,6 +328,7 @@ Type *type_specifier() {
     }
 
     ty->is_typedef = is_typedef;
+    ty->is_static = is_static;
     return ty;
 }
 
@@ -556,8 +556,11 @@ VarList *read_func_param() {
     ty = declarator(ty, &name);
     ty = type_suffix(ty);
 
+    Var *var = push_var(name, ty, true);
+    push_scope(name)->var = var;
+
     VarList *vl = calloc(1, sizeof(VarList));
-    vl->var = push_var(name, ty, true);
+    vl->var = var;
     return vl;
 }
 
@@ -593,7 +596,8 @@ Function *function() {
     ty = declarator(ty, &name);
 
     // 関数の名前と型の組み合わせをスコープに追加する
-    push_var(name, func_type(ty), false);
+    Var *var = push_var(name, func_type(ty), false);
+    push_scope(name)->var = var;
 
     Function *fn = calloc(1, sizeof(Function));
     fn->name = name;
@@ -633,7 +637,9 @@ void global_var() {
     ty = declarator(ty, &name);
     ty = type_suffix(ty);
     expect(";");
-    push_var(name, ty, false);
+
+    Var *var = push_var(name, ty, false);
+    push_scope(name)->var = var;
 }
 
 // declaration = type-specifier declarator type-suffix ("=" expr)? ";"
@@ -642,7 +648,7 @@ Node *declaration() {
     Token *tok = token;
     Type *ty = type_specifier();
 
-    // 型の定義だけあり変数がない場合は、構造体のタグ登録だけを意図している
+    // 型の定義だけあり変数がない場合は、構造体/列挙型のタグ登録だけを意図している
     // type_specifier によるパースで型が登録され目的を達成しているので NULL ノードにする
     if (consume(";")) {
         return new_node(ND_NULL, tok);
@@ -668,7 +674,20 @@ Node *declaration() {
         error_tok(tok, "variable declared void");
     }
 
-    Var *var = push_var(name, ty, true);
+    Var *var;
+    if (ty->is_static) {
+        // ブロック内で static 変数が宣言される場合
+        // ブロック内の static 変数とは、スコープがブロック内だけど関数を抜けても解放されない
+        // すなわちグローバル変数と同じ位置に領域を確保する必要がある
+        // なのでグローバル変数として登録
+        var = push_var(new_label(), ty, false);
+    }
+    else {
+        // static じゃないなら普通にブロックスコープの変数として登録
+        var = push_var(name, ty, true);
+    }
+    // 変数を今のスコープに追加する (グローバルスコープには追加しない)
+    push_scope(name)->var = var;
 
     // 初期値のない変数宣言はからっぽの文になる
     if (consume(";")) {
@@ -677,6 +696,7 @@ Node *declaration() {
 
     // 初期値がある場合は代入文になる
     expect("=");
+
     Node *lhs = new_var(var, tok);
     Node *rhs = expr();
     expect(";");
@@ -687,7 +707,8 @@ Node *declaration() {
 bool is_typename() {
     return peek("void") || peek("_Bool") ||
            peek("char") || peek("short") || peek("int") || peek("long") ||
-           peek("enum") || peek("struct") || peek("typedef") || find_typedef(token);
+           peek("enum") || peek("struct") || peek("typedef") || peek("static") ||
+           find_typedef(token);
 }
 
 Node *read_expr_stmt() {
