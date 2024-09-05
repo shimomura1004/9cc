@@ -121,7 +121,8 @@ char *starts_with_reserved(char *p) {
         "short",
         "long",
         "void",
-        "_Bool"
+        "_Bool",
+        "enum",
     };
 
     for (int i=0; i < sizeof(kw) / sizeof(*kw); i++) {

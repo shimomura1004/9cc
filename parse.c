@@ -1,13 +1,15 @@
 #include <string.h>
 #include "9cc.h"
 
-// ローカル変数、グローバル変数、typedef が登録される
+// ローカル変数、グローバル変数、typedef、enum が登録される
 typedef struct VarScope VarScope;
 struct VarScope {
     VarScope *next;
     char *name;
     Var *var;
     Type *type_def;
+    Type *enum_ty;
+    int enum_val;
 };
 
 // 構造体定義が登録される
@@ -140,6 +142,7 @@ Type *abstract_declarator(Type *ty);
 Type *type_suffix(Type *ty);
 Type *type_name();
 Type *struct_decl();
+Type *enum_specifier();
 Member *struct_member();
 void global_var();
 Node *declaration();
@@ -191,6 +194,8 @@ Program *program() {
             continue;
         }
 
+        // グローバル変数の定義であって、現状では型定義のみの宣言はできない
+        // 関数定義の中の declaration は型定義のみの宣言に対応している
         global_var();
     }
 
@@ -200,7 +205,7 @@ Program *program() {
     return prog;
 }
 
-// type-specifier = builtin-type | struct-decl | typedef-name
+// type-specifier = builtin-type | struct-decl | typedef-name | enum-specifier
 // buildin-type = "void"
 //              | "_Bool"
 //              | "char"
@@ -267,6 +272,13 @@ Type *type_specifier() {
             }
             // struct から始まっているのであれば構造体の宣言としてパース
             user_type = struct_decl();
+        }
+        else if (peek("enum")) {
+            // 構造体と同様に、既になんらかの型のトークン列を読んでいたら抜ける
+            if (base_type || user_type) {
+                break;
+            }
+            user_type = enum_specifier();
         }
         else {
             // 型宣言以外のなにかがきた場合
@@ -411,6 +423,9 @@ Type *struct_decl() {
         if (!sc) {
             error_tok(tag, "unknown struct type");
         }
+        if (sc->ty->kind != TY_STRUCT) {
+            error_tok(tag, "not a struct tag");
+        }
         return sc->ty;
     }
 
@@ -455,6 +470,64 @@ Type *struct_decl() {
     // 構造体名(タグ)が宣言されていた場合はタグリストに登録する
     // struct Position { int x; int y; }
     // のとき、{int x; int y;} という構造体型を Position というタグで登録する
+    if (tag) {
+        push_tag_scope(tag, ty);
+    }
+    return ty;
+}
+
+// enum-specifier = "enum" ident
+//                | "enum" ident? "{" enum-list? "}"
+// enum-list = ident ("=" num)? ("," ident ("=" num)?)* ","?
+Type *enum_specifier() {
+    expect("enum");
+    Type *ty = enum_type();
+
+    // enum の型名が書いてあって、かつその後ろに開きかっこがないのであれば
+    // enum の定義ではなく、その enum 型の変数の定義をしている
+    // e.g., enum Color {red, blue}; enum Color c;
+    Token *tag = consume_ident();
+    if (tag && !peek("{")) {
+        // スコープに enum の定義があるはず
+        TagScope *sc = find_tag(tag);
+        if (!sc) {
+            error_tok(tag, "unknown enum type");
+        }
+        if (sc->ty->kind != TY_ENUM) {
+            error_tok(tag, "not an enum tag");
+        }
+        return sc->ty;
+    }
+
+    // 開きかっこがある場合は enum の定義
+    expect("{");
+
+    // enum-list のパース
+    int cnt = 0;
+    for (;;) {
+        char *name = expect_ident();
+        // enum の定数値に値が指定されている場合
+        if (consume("=")) {
+            cnt = expect_number();
+        }
+
+        // enum の定数名をスコープに加える
+        VarScope *sc = push_scope(name);
+        sc->enum_ty = ty;
+        sc->enum_val = cnt++;
+
+        if (consume(",")) {
+            if (consume("}")) {
+                break;
+            }
+            continue;
+        }
+
+        expect("}");
+        break;
+    }
+
+    // enum の型名をスコープに加える
     if (tag) {
         push_tag_scope(tag, ty);
     }
@@ -614,7 +687,7 @@ Node *declaration() {
 bool is_typename() {
     return peek("void") || peek("_Bool") ||
            peek("char") || peek("short") || peek("int") || peek("long") ||
-           peek("struct") || peek("typedef") || find_typedef(token);
+           peek("enum") || peek("struct") || peek("typedef") || find_typedef(token);
 }
 
 Node *read_expr_stmt() {
@@ -1002,8 +1075,13 @@ Node *primary() {
 
         // 関数呼び出しでない場合は通常の変数
         VarScope *sc = find_var(tok);
-        if (sc && sc->var) {
-            return new_var(sc->var, tok);
+        if (sc) {
+            if (sc->var) {
+                return new_var(sc->var, tok);
+            }
+            if (sc->enum_ty) {
+                return new_num(sc->enum_val, tok);
+            }
         }
         // 識別子が見つからないか、見つかっても typedef された値だったらエラー
         error_tok(tok, "undefined variable");
