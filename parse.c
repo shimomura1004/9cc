@@ -721,7 +721,7 @@ Node *read_expr_stmt() {
 //      | "return" expr ";"
 //      | "if" "(" expr ")" stmt ("else" stmt)?
 //      | "while" "(" expr ")" stmt
-//      | "for" "(" expr? ";" expr? ";" expr? ")" stmt
+//      | "for" "(" ( expr? ";" | declaration ) expr? ";" expr? ")" stmt
 //      | declaration
 Node *stmt() {
     Token *tok;
@@ -760,11 +760,23 @@ Node *stmt() {
     if (tok = consume("for")) {
         Node *node = new_node(ND_FOR, tok);
         expect("(");
+
+        VarScope *sc1 = var_scope;
+        TagScope *sc2 = tag_scope;
+
         // 初期化部がからっぽの場合はなにも出力しない
         if (!consume(";")) {
-            // 初期化部の評価結果は捨てる
-            node->init = read_expr_stmt();
-            expect(";");
+            if (is_typename()) {
+                // 変数宣言が始まった場合
+                // declaration には末尾の ";" のパースまで含まれている
+                node->init = declaration();
+            }
+            else {
+                // ただの代入文の場合
+                // 初期化部の評価結果は捨てる
+                node->init = read_expr_stmt();
+                expect(";");
+            }
         }
         if (!consume(";")) {
             // 条件部の結果はスタックトップに残す必要がある
@@ -777,6 +789,10 @@ Node *stmt() {
             expect(")");
         }
         node->then = stmt();
+
+        // for 文を抜けたあとはスコープを元に戻す
+        var_scope = sc1;
+        tag_scope = sc2;
         return node;
     }
 
