@@ -184,6 +184,10 @@ void visit(Node *node) {
     case ND_ASSIGN:
         node->ty = node->lhs->ty;
         return;
+    case ND_COMMA:
+        // コンマでつながっている場合は右側の式の型が全体の型になる
+        node->ty = node->rhs->ty;
+        return;
     case ND_MEMBER: {
         // 構造体のメンバアクセスのノードの型をつける
         // 構造体以外のノードにメンバアクセスしようとしていたらエラー

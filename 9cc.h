@@ -87,6 +87,7 @@ typedef enum {
     ND_MUL,         // *
     ND_DIV,         // /
     ND_ASSIGN,      // =
+    ND_COMMA,       // ,
     ND_MEMBER,      // . 構造体のメンバアクセス
     ND_ADDR,        // 単項 &
     ND_DEREF,       // 単項 *

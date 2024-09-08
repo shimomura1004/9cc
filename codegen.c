@@ -325,6 +325,10 @@ void gen(Node *node) {
         // スタックに入っている値を、スタックに入っているアドレスに保存
         store(node->ty);
         return;
+    case ND_COMMA:
+        gen(node->lhs);
+        gen(node->rhs);
+        return;
     case ND_ADDR:
         gen_addr(node->lhs);
         return;
