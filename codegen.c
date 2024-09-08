@@ -106,6 +106,23 @@ void truncate(Type *ty) {
     printf("  push rax\n");
 }
 
+// スタックトップにある値をインクリメントして置き換える
+void inc(Type *ty) {
+    printf("  pop rax\n");
+    // ty->base に値が入っているということは、この型は基本型ではなく配列やポインタなど
+    // この場合は単純に1を足すのではなく変数の型に応じて足さないといけない
+    // アドレスに対する加減算と同じ
+    printf("  add rax, %d\n", ty->base ? size_of(ty->base) : 1);
+    printf("  push rax\n");
+}
+
+// スタックトップにある値をデクリメントして置き換える
+void dec(Type *ty) {
+    printf("  pop rax\n");
+    printf("  sub rax, %d\n", ty->base ? size_of(ty->base) : 1);
+    printf("  push rax\n");
+}
+
 // 変数のオフセットを計算してスタックトップに置く
 void gen_addr(Node *node) {
     switch (node->kind) {
@@ -141,6 +158,7 @@ void gen_addr(Node *node) {
 }
 
 // 左辺値のためのコードを生成する
+// エラーチェックだけして gen_addr を呼ぶだけ
 void gen_lval(Node *node) {
     if (node->ty->kind == TY_ARRAY) {
         // 配列型変数への代入はできない
@@ -324,6 +342,52 @@ void gen(Node *node) {
         gen(node->rhs);
         // スタックに入っている値を、スタックに入っているアドレスに保存
         store(node->ty);
+        return;
+    case ND_PRE_INC:
+        // まずインクリメントの対象となっている式のアドレスを計算してスタックトップに置く
+        gen_lval(node->lhs);
+        // rsp の指す場所にあるデータ(つまり gen_lval で計算した結果)をスタックトップに置く
+        printf("  push [rsp]\n");
+        // この時点でスタックの最上位2つのデータはインクリメントの対象となっている式のアドレス
+        // load でスタックトップのアドレスが指す値を取り出し置き換え
+        load(node->ty);
+        // インクリメント
+        inc(node->ty);
+        // この時点でスタックの最上位にはインクリメント済みの値、その次にアドレスが入っている
+        // よって store でインクリメントした結果を書き戻すことができる
+        store(node->ty);
+        // この時点でインクリメント対象が保存されているメモリの内容が更新完了
+        // さらに store はスタックトップに値を残すので、インクリメント済みの値が
+        // 式と評価結果としてスタックトップに残っている
+        return;
+    case ND_PRE_DEC:
+        gen_lval(node->lhs);
+        printf("  push [rsp]\n");
+        load(node->ty);
+        dec(node->ty);
+        store(node->ty);
+        return;
+    case ND_POST_INC:
+        // PRE_INC と同様に、スタックの上位2つにインクリメント対象の式のアドレスを準備する
+        gen_lval(node->lhs);
+        printf("  push [rsp]\n");
+        // load/inc/store で、最上位の値をインクリメントした後の値に変換する
+        load(node->ty);
+        inc(node->ty);
+        store(node->ty);
+        // この段階でインクリメント対象が保存されているメモリの内容は書き換わっている
+        // 後置++の場合はインクリメント前の値でその後の計算をしないといけないのでデクリメントする
+        dec(node->ty);
+        // この段階で、インクリメント対象が保存されているメモリはインクリメント後の値で書き換わり
+        // スタックトップはインクリメント前の値に戻っている
+        return;
+    case ND_POST_DEC:
+        gen_lval(node->lhs);
+        printf("  push [rsp]\n");
+        load(node->ty);
+        dec(node->ty);
+        store(node->ty);
+        inc(node->ty);
         return;
     case ND_COMMA:
         gen(node->lhs);
