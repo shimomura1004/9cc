@@ -99,6 +99,7 @@ typedef enum {
     ND_MEMBER,      // . 構造体のメンバアクセス
     ND_ADDR,        // 単項 &
     ND_DEREF,       // 単項 *
+    ND_NOT,         // !
     ND_VAR,         // 変数
     ND_EQ,          // ==
     ND_NE,          // !=

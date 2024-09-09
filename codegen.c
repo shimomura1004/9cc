@@ -242,6 +242,17 @@ void gen(Node *node) {
         // 関数を抜ける前の共通処理(epilogue)があるので直接 ret せずジャンプ
         printf("  jmp .Lreturn.%s\n", funcname);
         return;
+    case ND_NOT:
+        // 値を計算しスタックトップに置く
+        gen(node->lhs);
+        printf("  pop rax\n");
+        printf("  cmp rax, 0\n");
+        // sete は直前の cmp の結果が equal だったら al に 1 を書き込む
+        printf("  sete al\n");
+        // 64ビットに拡張した上でスタックトップに置く
+        printf("  movzb rax, al\n");
+        printf("  push rax\n");
+        return;
     case ND_IF: {
         int seq = labelseq++;
 
