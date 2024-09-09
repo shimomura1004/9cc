@@ -389,6 +389,54 @@ void gen(Node *node) {
         store(node->ty);
         inc(node->ty);
         return;
+    case ND_A_ADD:
+    case ND_A_SUB:
+    case ND_A_MUL:
+    case ND_A_DIV: {
+        // x += y は  x = x + y と同じ
+        // まず左辺値のアドレスを2つスタックトップに置く
+        gen_lval(node->lhs);
+        printf("  push [rsp]\n");
+        // スタックトップの値を値で置き換え
+        load(node->lhs->ty);
+        // 加算する値を計算しスタックトップに置く
+        gen(node->rhs);
+        // 式が x += y のとき、この時点でスタックは上から (y の値) (x の値) (x のアドレス)
+        printf("  pop rdi\n");
+        printf("  pop rax\n");
+        // この時点で rdi と rax に y と x の値がそれぞれ入っている
+        // スタックトップには x のアドレスが入っている
+
+        // rdi と rax を使って右辺を計算する
+        switch (node->kind) {
+        case ND_A_ADD:
+            if (node->ty->base) {
+                // 配列やポインタ型の場合は変数のサイズをかけた値を足す必要がある
+                printf("  imul rdi, %d\n", size_of(node->ty->base));
+            }
+            printf("  add rax, rdi\n");
+            break;
+        case ND_A_SUB:
+            if (node->ty->base) {
+                printf("  imul rdi, %d\n", size_of(node->ty->base));
+            }
+            printf("  sub rax, rdi\n");
+            break;
+        case ND_A_MUL:
+            printf("  imul rax, rdi\n");
+            break;
+        case ND_A_DIV:
+            printf("  cqo\n");
+            printf("  idiv rdi\n");
+            break;
+        }
+
+        // rax に入った計算結果をスタックトップに置く
+        printf("  push rax\n");
+        // x のアドレスに値を書き戻す
+        store(node->ty);
+        return;
+    }
     case ND_COMMA:
         gen(node->lhs);
         gen(node->rhs);

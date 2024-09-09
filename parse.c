@@ -843,7 +843,8 @@ Node *expr() {
     return node;
 }
 
-// assign = equality ("=" assign)?
+// assign    = equality (assign-op assign)?
+// assign-op = "=" | "+=" | "-=" | "*=" | "/="
 Node *assign() {
     Node *node = equality();
     Token *tok;
@@ -851,6 +852,19 @@ Node *assign() {
     if (tok = consume("=")) {
         node = new_binary(ND_ASSIGN, node, assign(), tok);
     }
+    if (tok = consume("+=")) {
+        node = new_binary(ND_A_ADD, node, assign(), tok);
+    }
+    if (tok = consume("-=")) {
+        node = new_binary(ND_A_SUB, node, assign(), tok);
+    }
+    if (tok = consume("*=")) {
+        node = new_binary(ND_A_MUL, node, assign(), tok);
+    }
+    if (tok = consume("/=")) {
+        node = new_binary(ND_A_DIV, node, assign(), tok);
+    }
+
     return node;
 }
 
