@@ -86,6 +86,9 @@ typedef enum {
     ND_SUB,         // -
     ND_MUL,         // *
     ND_DIV,         // /
+    ND_BITAND,      // &
+    ND_BITOR,       // |
+    ND_BITXOR,      // ^
     ND_ASSIGN,      // =
     ND_PRE_INC,     // pre ++
     ND_PRE_DEC,     // pre --
