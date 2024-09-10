@@ -191,8 +191,10 @@ void visit(Node *node) {
     case ND_A_SUB:
     case ND_A_MUL:
     case ND_A_DIV:
-        // 代入された値の型にそろえる
+        // 代入演算子の場合は、代入された値の型にそろえる
         // たとえば (x += y) の型は x の型と同じ
+    case ND_BITNOT:
+        // ビット反転した結果は、元々の型と同じ
         node->ty = node->lhs->ty;
         return;
     case ND_COMMA:
