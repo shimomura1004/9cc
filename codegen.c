@@ -259,6 +259,49 @@ void gen(Node *node) {
         printf("  not rax\n");
         printf("  push rax\n");
         return;
+    case ND_LOGAND: {
+        int seq = labelseq++;
+        // && は短絡の可能性がある
+        // まず左側の式を計算しスタックトップに置く
+        gen(node->lhs);
+        // 左側の式の値が 0 かどうかを判定
+        printf("  pop rax\n");
+        printf("  cmp rax, 0\n");
+        // 0 の場合(すなわち右側の式を評価する必要がなくなったとき)はジャンプ
+        printf("  je  .Lfalse%d\n", seq);
+        // 右側の式でも同様の処理を実施
+        gen(node->rhs);
+        printf("  pop rax\n");
+        printf("  cmp rax, 0\n");
+        printf("  je  .Lfalse%d\n", seq);
+        // どちらも 0 でなかった場合は 1 を push して終了
+        printf("  push 1\n");
+        printf("  jmp .Lend%d\n", seq);
+        // 0 になった場合のジャンプ先をここに出力
+        printf(".Lfalse%d:\n", seq);
+        printf("  push 0\n");
+        // 出口にもラベル
+        printf(".Lend%d:\n", seq);
+        return;
+    }
+    case ND_LOGOR: {
+        // LOGAND の場合と同じだが、1 のとき短絡する
+        int seq = labelseq++;
+        gen(node->lhs);
+        printf("  pop rax\n");
+        printf("  cmp rax, 0\n");
+        printf("  jne .Ltrue%d\n", seq);
+        gen(node->rhs);
+        printf("  pop rax\n");
+        printf("  cmp rax, 0\n");
+        printf("  jne .Ltrue%d\n", seq);
+        printf("  push 0\n");
+        printf("  jmp .Lend%d\n", seq);
+        printf(".Ltrue%d:\n", seq);
+        printf("  push 1\n");
+        printf(".Lend%d:\n", seq);
+        return;
+    }
     case ND_IF: {
         int seq = labelseq++;
 

@@ -104,6 +104,8 @@ typedef enum {
     ND_DEREF,       // 単項 *
     ND_NOT,         // !
     ND_BITNOT,      // ~
+    ND_LOGAND,      // &&
+    ND_LOGOR,       // ||
     ND_VAR,         // 変数
     ND_EQ,          // ==
     ND_NE,          // !=
