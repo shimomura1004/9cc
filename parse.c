@@ -20,11 +20,28 @@ struct TagScope {
     Type *ty;
 };
 
+typedef struct {
+    VarScope *var_scope;
+    TagScope *tag_scope;
+} Scope;
+
 VarList *globals;       // グローバル変数のリスト
 VarList *locals;        // ローカル変数のリスト
 
 VarScope *var_scope;    // 今のスコープで定義されている変数のリスト
 TagScope *tag_scope;    // 今のスコープで定義されているタグのリスト
+
+Scope *enter_scope() {
+    Scope *sc = calloc(1, sizeof(Scope));
+    sc->var_scope = var_scope;
+    sc->tag_scope = tag_scope;
+    return sc;
+}
+
+void leave_scope(Scope *sc) {
+    var_scope = sc->var_scope;
+    tag_scope = sc->tag_scope;
+}
 
 // 今パースしている関数のスコープ内で定義されている変数と typedef のリストの中から
 // tok を探す
@@ -765,9 +782,7 @@ Node *stmt() {
     if (tok = consume("for")) {
         Node *node = new_node(ND_FOR, tok);
         expect("(");
-
-        VarScope *sc1 = var_scope;
-        TagScope *sc2 = tag_scope;
+        Scope *sc = enter_scope();
 
         // 初期化部がからっぽの場合はなにも出力しない
         if (!consume(";")) {
@@ -796,8 +811,7 @@ Node *stmt() {
         node->then = stmt();
 
         // for 文を抜けたあとはスコープを元に戻す
-        var_scope = sc1;
-        tag_scope = sc2;
+        leave_scope(sc);
         return node;
     }
 
@@ -810,16 +824,14 @@ Node *stmt() {
         // ブロックの中だけで有効な変数が定義されるかもしれないので
         // 今の scope を控えておく
         // ブロック内をパースしている間は一時的にリストが伸びることになる
-        VarScope *sc1 = var_scope;
-        TagScope *sc2 = tag_scope;
+        Scope *sc = enter_scope();
         // 中身の複数文を順番にリストに入れていく
         while (!consume("}")) {
             cur->next = stmt();
             cur = cur->next;
         }
         // ブロック内で定義されていた変数を忘れるため、scope を戻す
-        var_scope = sc1;
-        tag_scope = sc2;
+        leave_scope(sc);
 
         Node *node = new_node(ND_BLOCK, tok);
         node->body = head.next;
@@ -1101,8 +1113,7 @@ Node *postfix() {
 
 // stmt-expr = stmt* "}" ")"
 Node *stmt_expr(Token *tok) {
-    VarScope *sc1 = var_scope;
-    TagScope *sc2 = tag_scope;
+    Scope *sc = enter_scope();
 
     Node *node = new_node(ND_STMT_EXPR, tok);
     node->body = stmt();
@@ -1116,8 +1127,7 @@ Node *stmt_expr(Token *tok) {
     }
     expect(")");
 
-    var_scope = sc1;
-    tag_scope = sc2;
+    leave_scope(sc);
 
     // 最後の文は値を返さないといけない
     if (cur->kind != ND_EXPR_STMT) {
