@@ -40,7 +40,8 @@ struct Token {
 typedef struct Var Var;
 struct Var {
     char *name;     // 変数名
-    Type *ty;
+    Type *ty;       // 型
+    Token *tok;     // エラーメッセージ用
     bool is_local;  // ローカル変数かグローバル変数か
 
     // ローカル変数用
@@ -197,16 +198,18 @@ struct Type {
     TypeKind kind;
     bool is_typedef;
     bool is_static;
+    bool is_incomplete; // incomplete array
     int align;
-    Type *base;
+    Type *base;         // ポインタか配列型のとき、ベースとなる型が入る
     int array_size;
-    Member *members;
-    Type *return_ty;
+    Member *members;    // 構造体のメンバ
+    Type *return_ty;    // 関数の戻り値型
 };
 
 struct Member {
     Member *next;
     Type *ty;
+    Token *tok;
     char *name;
     int offset;
 };
@@ -222,7 +225,7 @@ Type *enum_type();
 Type *func_type(Type *return_ty);
 Type *pointer_to(Type *base);
 Type *array_of(Type *base, int size);
-int size_of(Type *ty);
+int size_of(Type *ty, Token* tok);
 
 void add_type(Program *prog);
 

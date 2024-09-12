@@ -107,11 +107,12 @@ VarScope *push_scope(char *name) {
 }
 
 // 新しい変数のエントリを作って変数リストに足し、新しく作った変数を返す
-Var *push_var(char *name, Type *ty, bool is_local) {
+Var *push_var(char *name, Type *ty, bool is_local, Token *tok) {
     Var *var = calloc(1, sizeof(Var));
     var->name = name;
     var->ty = ty;
     var->is_local = is_local;
+    var->tok = tok;
 
     VarList *vl = calloc(1, sizeof(VarList));
     vl->var = var;
@@ -403,17 +404,27 @@ Type *abstract_declarator(Type *ty) {
     return type_suffix(ty);
 }
 
-// type-suffix = ( "[" num "]" type-suffix)?
-// 型の後置修飾語(配列の括弧)をパース
+// type-suffix = ( "[" num? "]" type-suffix)?
+// 型の後置修飾語(配列の括弧)をパース(配列の要素数がない場合もある)
 Type *type_suffix(Type *ty) {
     if (!consume("[")) {
         return ty;
     }
-    int sz = expect_number();
-    expect("]");
+
+    int sz = 0;
+    bool is_incomplete = true;
+    if (!consume("]")) {
+        sz = expect_number();
+        is_incomplete = false;
+        expect("]");
+    }
+    // 配列の要素数がない場合は incomplete である
+
     // さらに後ろをパースし、配列型とする
     ty = type_suffix(ty);
-    return array_of(ty, sz);
+    ty = array_of(ty, sz);
+    ty->is_incomplete = is_incomplete;
+    return ty;
 }
 
 // type-name = type-specifier abstract-declarator type-suffix
@@ -479,7 +490,7 @@ Type *struct_decl() {
         // よってメンバの型のサイズの倍数の位置に合わせる
         offset = align_to(offset, mem->ty->align);
         mem->offset = offset;
-        offset += size_of(mem->ty);
+        offset += size_of(mem->ty, mem->tok);
 
         // 構造体自身のアラインメントは、メンバの最大サイズになる
         // 構造体が配列になったときへの対応のため、
@@ -559,6 +570,7 @@ Type *enum_specifier() {
 // struct-member = type-specifier declarator type-suffix ";"
 Member *struct_member() {
     Type *ty = type_specifier();
+    Token *tok = token;
     char *name = NULL;
     ty = declarator(ty, &name);
     ty = type_suffix(ty);
@@ -567,6 +579,7 @@ Member *struct_member() {
     Member *mem = calloc(1, sizeof(Member));
     mem->name =name;
     mem->ty = ty;
+    mem->tok = tok;
     return mem;
 }
 
@@ -574,11 +587,12 @@ Member *struct_member() {
 // e.g., "int *x[10]"
 VarList *read_func_param() {
     Type *ty = type_specifier();
+    Token *tok = token;
     char *name = NULL;
     ty = declarator(ty, &name);
     ty = type_suffix(ty);
 
-    Var *var = push_var(name, ty, true);
+    Var *var = push_var(name, ty, true, tok);
     push_scope(name)->var = var;
 
     VarList *vl = calloc(1, sizeof(VarList));
@@ -614,11 +628,12 @@ Function *function() {
     locals = NULL;
 
     Type *ty = type_specifier();
+    Token *tok = token;
     char *name = NULL;
     ty = declarator(ty, &name);
 
     // 関数の名前と型の組み合わせをスコープに追加する
-    Var *var = push_var(name, func_type(ty), false);
+    Var *var = push_var(name, func_type(ty), false, tok);
     push_scope(name)->var = var;
 
     Function *fn = calloc(1, sizeof(Function));
@@ -655,27 +670,29 @@ Function *function() {
 // global-var = type-specifier declarator type-suffix ";"
 void global_var() {
     Type *ty = type_specifier();
+    Token *tok = token;
     char *name = NULL;
     ty = declarator(ty, &name);
     ty = type_suffix(ty);
     expect(";");
 
-    Var *var = push_var(name, ty, false);
+    Var *var = push_var(name, ty, false, tok);
     push_scope(name)->var = var;
 }
 
 // declaration = type-specifier declarator type-suffix ("=" expr)? ";"
 //             | type-specifier ";"
 Node *declaration() {
-    Token *tok = token;
+    Token *tok;
     Type *ty = type_specifier();
 
     // 型の定義だけあり変数がない場合は、構造体/列挙型のタグ登録だけを意図している
     // type_specifier によるパースで型が登録され目的を達成しているので NULL ノードにする
-    if (consume(";")) {
+    if (tok = consume(";")) {
         return new_node(ND_NULL, tok);
     }
 
+    tok = token;
     char *name = NULL;
     ty = declarator(ty, &name);
     ty = type_suffix(ty);
@@ -702,11 +719,11 @@ Node *declaration() {
         // ブロック内の static 変数とは、スコープがブロック内だけど関数を抜けても解放されない
         // すなわちグローバル変数と同じ位置に領域を確保する必要がある
         // なのでグローバル変数として登録
-        var = push_var(new_label(), ty, false);
+        var = push_var(new_label(), ty, false, tok);
     }
     else {
         // static じゃないなら普通にブロックスコープの変数として登録
-        var = push_var(name, ty, true);
+        var = push_var(name, ty, true, tok);
     }
     // 変数を今のスコープに追加する (グローバルスコープには追加しない)
     push_scope(name)->var = var;
@@ -1184,7 +1201,7 @@ Node *primary() {
             if (is_typename()) {
                 Type *ty = type_name();
                 expect(")");
-                return new_num(size_of(ty), tok);
+                return new_num(size_of(ty, tok), tok);
             }
             // この時点で tok は sizeof を指しているの
             // next は開き括弧から始まる unary と思われるトークンを指す
@@ -1243,7 +1260,7 @@ Node *primary() {
         Type *ty = array_of(char_type(), tok->cont_len);
         // 変数ではなくラベルを登録する
         // ラベルはコード生成時にラベルとして使われる
-        Var *var = push_var(new_label(), ty, false);
+        Var *var = push_var(new_label(), ty, false, NULL);
         var->contents = tok->contents;
         var->cont_len = tok->cont_len;
         // 文字列リテラルは変数として扱う

@@ -20,7 +20,7 @@ char *argreg8[] = { "rdi", "rsi", "rdx", "rcx",  "r8",  "r9" };
 void load(Type *ty) {
     printf("  pop rax\n");
 
-    int sz = size_of(ty);
+    int sz = size_of(ty, NULL);
     if (sz == 1) {
         // rax が指すアドレスから1バイト読んで rax にいれる
         printf("  movsx rax, byte ptr [rax]\n");
@@ -60,7 +60,7 @@ void store(Type *ty) {
         printf("  movzb rdi, dil\n");
     }
 
-    int sz = size_of(ty);
+    int sz = size_of(ty, NULL);
     // 左辺の変数のメモリ領域に右辺の計算結果を入れる
     if (sz == 1) {
         // dil は rdi の最下位1バイト
@@ -91,7 +91,7 @@ void truncate(Type *ty) {
         printf("  setne al\n");
     }
 
-    int sz = size_of(ty);
+    int sz = size_of(ty, NULL);
     if (sz == 1) {
         printf("  movsx rax, al\n");
     }
@@ -107,19 +107,21 @@ void truncate(Type *ty) {
 }
 
 // スタックトップにある値をインクリメントして置き換える
-void inc(Type *ty) {
+void inc(Node *node) {
+    int sz = node->ty->base ? size_of(node->ty->base, node->tok) : 1;
     printf("  pop rax\n");
     // ty->base に値が入っているということは、この型は基本型ではなく配列やポインタなど
     // この場合は単純に1を足すのではなく変数の型に応じて足さないといけない
     // アドレスに対する加減算と同じ
-    printf("  add rax, %d\n", ty->base ? size_of(ty->base) : 1);
+    printf("  add rax, %d\n", sz);
     printf("  push rax\n");
 }
 
 // スタックトップにある値をデクリメントして置き換える
-void dec(Type *ty) {
+void dec(Node *node) {
+    int sz = node->ty->base ? size_of(node->ty->base, node->tok) : 1;
     printf("  pop rax\n");
-    printf("  sub rax, %d\n", ty->base ? size_of(ty->base) : 1);
+    printf("  sub rax, %d\n", sz);
     printf("  push rax\n");
 }
 
@@ -412,7 +414,7 @@ void gen(Node *node) {
         // load でスタックトップのアドレスが指す値を取り出し置き換え
         load(node->ty);
         // インクリメント
-        inc(node->ty);
+        inc(node);
         // この時点でスタックの最上位にはインクリメント済みの値、その次にアドレスが入っている
         // よって store でインクリメントした結果を書き戻すことができる
         store(node->ty);
@@ -424,7 +426,7 @@ void gen(Node *node) {
         gen_lval(node->lhs);
         printf("  push [rsp]\n");
         load(node->ty);
-        dec(node->ty);
+        dec(node);
         store(node->ty);
         return;
     case ND_POST_INC:
@@ -433,11 +435,11 @@ void gen(Node *node) {
         printf("  push [rsp]\n");
         // load/inc/store で、最上位の値をインクリメントした後の値に変換する
         load(node->ty);
-        inc(node->ty);
+        inc(node);
         store(node->ty);
         // この段階でインクリメント対象が保存されているメモリの内容は書き換わっている
         // 後置++の場合はインクリメント前の値でその後の計算をしないといけないのでデクリメントする
-        dec(node->ty);
+        dec(node);
         // この段階で、インクリメント対象が保存されているメモリはインクリメント後の値で書き換わり
         // スタックトップはインクリメント前の値に戻っている
         return;
@@ -445,9 +447,9 @@ void gen(Node *node) {
         gen_lval(node->lhs);
         printf("  push [rsp]\n");
         load(node->ty);
-        dec(node->ty);
+        dec(node);
         store(node->ty);
-        inc(node->ty);
+        inc(node);
         return;
     case ND_A_ADD:
     case ND_A_SUB:
@@ -472,13 +474,13 @@ void gen(Node *node) {
         case ND_A_ADD:
             if (node->ty->base) {
                 // 配列やポインタ型の場合は変数のサイズをかけた値を足す必要がある
-                printf("  imul rdi, %d\n", size_of(node->ty->base));
+                printf("  imul rdi, %d\n", size_of(node->ty->base, node->tok));
             }
             printf("  add rax, rdi\n");
             break;
         case ND_A_SUB:
             if (node->ty->base) {
-                printf("  imul rdi, %d\n", size_of(node->ty->base));
+                printf("  imul rdi, %d\n", size_of(node->ty->base, node->tok));
             }
             printf("  sub rax, rdi\n");
             break;
@@ -534,13 +536,13 @@ void gen(Node *node) {
         if (node->ty->base) {
             // ポインタ型か配列型の加算の場合の特別処理
             // ポインタへの加算は、ポインタの参照先の型のサイズ分の加算になる
-            printf("  imul rdi, %d\n", size_of(node->ty->base));
+            printf("  imul rdi, %d\n", size_of(node->ty->base, node->tok));
         }
         printf("  add rax, rdi\n");
         break;
     case ND_SUB:
         if (node->ty->base) {
-            printf("  imul rdi, %d\n", size_of(node->ty->base));
+            printf("  imul rdi, %d\n", size_of(node->ty->base, node->tok));
         }
         printf("  sub rax, rdi\n");
         break;
@@ -604,7 +606,7 @@ void emit_data(Program *prog) {
             // コンテンツがないということは、これは文字列ではない
             // グローバル変数の場合はゼロ初期化する
             // .zero は、指定したバイト数分の領域を 0 初期化して確保する
-            printf("  .zero %d\n", size_of(var->ty));
+            printf("  .zero %d\n", size_of(var->ty, var->tok));
             continue;
         }
 
@@ -617,7 +619,7 @@ void emit_data(Program *prog) {
 
 // 引数の型に応じて読み取るレジスタを変える
 void load_arg(Var *var, int idx) {
-    int sz = size_of(var->ty);
+    int sz = size_of(var->ty, var->tok);
     if (sz == 1) {
         printf("  mov [rbp-%d], %s\n", var->offset, argreg1[idx]);
     }

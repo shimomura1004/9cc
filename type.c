@@ -71,8 +71,12 @@ Type *array_of(Type *base, int size) {
 }
 
 // 型から変数サイズを計算
-int size_of(Type *ty) {
+int size_of(Type *ty, Token *tok) {
     assert(ty->kind != TY_VOID);
+
+    if (ty->is_incomplete) {
+        error_tok(tok, "incomplete type");
+    }
 
     switch (ty->kind) {
     case TY_BOOL:
@@ -87,7 +91,7 @@ int size_of(Type *ty) {
     case TY_PTR:
         return 8;
     case TY_ARRAY:
-        return size_of(ty->base) * ty->array_size;
+        return size_of(ty->base, tok) * ty->array_size;
     default:
         assert(ty->kind == TY_STRUCT);
         Member *mem = ty->members;
@@ -95,7 +99,7 @@ int size_of(Type *ty) {
             mem = mem->next;
         }
         // 最後のメンバのオフセットに、最後のメンバのサイズを足す
-        int end = mem->offset + size_of(mem->ty);
+        int end = mem->offset + size_of(mem->ty, tok);
         // 構造体自体の align には、メンバの中で最大の値が入っている
         // 最後のメンバのあとにもパディングが入る可能性がある
         return align_to(end, ty->align);
@@ -247,7 +251,7 @@ void visit(Node *node) {
         node->kind = ND_NUM;
         node->ty = int_type();
         // 型から値を計算
-        node->val = size_of(node->lhs->ty);
+        node->val = size_of(node->lhs->ty, node->tok);
         // sizeof 演算子の項では値の情報そのものは不要なので削除
         node->lhs = NULL;
         return;

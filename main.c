@@ -110,7 +110,7 @@ int main(int argc, char **argv) {
             Var *var = vl->var;
             // 今から追加したい変数のサイズに応じて、必要ならパディングを追加
             offset = align_to(offset, var->ty->align);
-            offset += size_of(var->ty);
+            offset += size_of(var->ty, var->tok);
             var->offset = offset;
         }
         // char などでスタックサイズが8の倍数からずれる可能性があるので調整
