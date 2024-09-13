@@ -592,6 +592,12 @@ VarList *read_func_param() {
     ty = declarator(ty, &name);
     ty = type_suffix(ty);
 
+    // 関数引数に限り、"型 T の配列" は "型 T へのポインタ" に変換される
+    // ちなみに int f(int x[3]) {return x[0];} は文法的に正しい
+    if (ty->kind == TY_ARRAY) {
+        ty = pointer_to(ty->base);
+    }
+
     Var *var = push_var(name, ty, true, tok);
     push_scope(name)->var = var;
 
