@@ -48,6 +48,12 @@ Type *enum_type() {
     return new_type(TY_ENUM, 4);
 }
 
+Type *struct_type() {
+    Type *ty = new_type(TY_STRUCT, 1);
+    ty->is_incomplete = true;
+    return ty;
+}
+
 Type *func_type(Type *return_ty) {
     // todo: おそらく align は使わないから1にしている、関数ポインタとは別物
     Type *ty = new_type(TY_FUNC, 1);

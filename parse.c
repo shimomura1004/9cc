@@ -6,6 +6,7 @@ typedef struct VarScope VarScope;
 struct VarScope {
     VarScope *next;
     char *name;
+    int depth;
     Var *var;
     Type *type_def;
     Type *enum_ty;
@@ -17,6 +18,7 @@ typedef struct TagScope TagScope;
 struct TagScope {
     TagScope *next;
     char *name;
+    int depth;
     Type *ty;
 };
 
@@ -30,17 +32,20 @@ VarList *locals;        // ローカル変数のリスト
 
 VarScope *var_scope;    // 今のスコープで定義されている変数のリスト
 TagScope *tag_scope;    // 今のスコープで定義されているタグのリスト
+int scope_depth;        // todo: 今のスコープのネストの深さ
 
 Scope *enter_scope() {
     Scope *sc = calloc(1, sizeof(Scope));
     sc->var_scope = var_scope;
     sc->tag_scope = tag_scope;
+    ++scope_depth;
     return sc;
 }
 
 void leave_scope(Scope *sc) {
     var_scope = sc->var_scope;
     tag_scope = sc->tag_scope;
+    --scope_depth;
 }
 
 // 今パースしている関数のスコープ内で定義されている変数と typedef のリストの中から
@@ -98,10 +103,12 @@ Node *new_var(Var *var, Token *tok) {
     return node;
 }
 
+// スコープに変数を追加する
 VarScope *push_scope(char *name) {
     VarScope *sc = calloc(1, sizeof(VarScope));
     sc->name = name;
     sc->next = var_scope;
+    sc->depth = scope_depth;
     var_scope = sc;
     return sc;
 }
@@ -436,37 +443,81 @@ Type *type_name() {
     return type_suffix(ty);
 }
 
+// スコープに型名を追加する
 void push_tag_scope(Token *tok, Type *ty) {
     TagScope *sc = calloc(1, sizeof(TagScope));
     sc->next = tag_scope;
     sc->name = strndup(tok->str, tok->len);
+    sc->depth = scope_depth;
     sc->ty = ty;
     tag_scope = sc;
 }
 
-// struct-decl = "struct" ident
-//             | "struct" "{" struct-member "}"
+// struct-decl = "struct" ident? ("{" struct-member "}")?
 Type *struct_decl() {
-    // "struct" のあとに識別子があり次のトークンが "{" でなければ struct tag
-    // e.g., struct Position p;
     expect("struct");
     Token *tag = consume_ident();
+
     if (tag && !peek("{")) {
+        // "struct" のあとに識別子があり、次のトークンが "{" でない場合は struct tag
+        // e.g., struct Position p;
+
+        // その場合は、tag という名前の構造体が定義されているかを調べる
         TagScope *sc = find_tag(tag);
+
         if (!sc) {
-            error_tok(tag, "unknown struct type");
+            // まだ定義されていない構造体型を使っている場合は
+            // とりあえず登録だけしてしまう
+            Type *ty = struct_type();
+            push_tag_scope(tag, ty);
+            return ty;
         }
+
         if (sc->ty->kind != TY_STRUCT) {
+            // スコープ内に型名は見つかったけど、構造体型ではなかったらエラー
             error_tok(tag, "not a struct tag");
         }
+
+        // 普通に定義済みの構造体型が見つかった場合はそれを返す
         return sc->ty;
     }
 
-    // "struct" のあとに識別子がなかった、もしくは識別子の次のトークンが
-    //  "{" の場合は、構造体の定義
+    // "struct" のあとに識別子がなかった、
+    // もしくは識別子はあったけど次のトークンが "{" の場合は、構造体の定義である
     // e.g., struct { int x; int y; }
-    //      struct Position { int x; int y; }
-    expect("{");
+    //       struct Position { int x; int y; }
+    // ただ "struct *foo" は正しい C の定義で、foo は未定義の構造体型へのポインタ型となる
+    if (!consume("{")) {
+        // 識別子はなく、次のトークンが "{" でもない、つまりなんの構造体を指しているかわからない
+        // 構造体名が指定されないけどポインタとして変数定義されている場合は
+        // とりあえず構造体として扱う
+        //   struct *foo の場合、struct までをパースして無名の構造体型になる
+        //   その後 *foo がパースされて無名の構造体へのポインタ型となる
+        return struct_type();
+    }
+
+    // 構造体名が書かれている場合は探す
+    TagScope *sc = find_tag(tag);
+    Type *ty;
+
+    if (sc && sc->depth == scope_depth) {
+        // 同じ階層に同じ型名が構造体以外として定義されていたら再定義エラー
+        if (sc->ty->kind != TY_STRUCT) {
+            error_tok(tag, "not a struct tag");
+        }
+        // 名前が被っていても構造体だったら問題なし
+        // スコープに登録されている型のデータを取り出し、
+        // メンバ定義部をパースして型の定義を完成させる
+        ty = sc->ty;
+    }
+    else {
+        // 同じ名前の型が定義されていなかった場合は新たに定義される構造体型である
+        // とりあえず名前だけ登録してメンバ定義に進む
+        ty = struct_type();
+        if (tag) {
+            push_tag_scope(tag, ty);
+        }
+    }
 
     Member head;
     head.next = NULL;
@@ -478,8 +529,6 @@ Type *struct_decl() {
         cur = cur->next;
     }
 
-    Type *ty = calloc(1, sizeof(Type));
-    ty->kind = TY_STRUCT;
     ty->members = head.next;
 
     // 構造体の各メンバに対してオフセットを計算する
@@ -500,12 +549,9 @@ Type *struct_decl() {
         }
     }
 
-    // 構造体名(タグ)が宣言されていた場合はタグリストに登録する
-    // struct Position { int x; int y; }
-    // のとき、{int x; int y;} という構造体型を Position というタグで登録する
-    if (tag) {
-        push_tag_scope(tag, ty);
-    }
+    // メンバ定義のパースまで終わったら構造体の定義は完了なので incomplete フラグは消す
+    ty->is_incomplete = false;
+
     return ty;
 }
 
