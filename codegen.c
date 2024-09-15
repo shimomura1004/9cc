@@ -3,7 +3,8 @@
 void gen(Node *node);
 
 // ユニークなラベルを作るための連番
-static int labelseq = 0;
+static int labelseq;
+static int brkseq;
 
 // 今コード生成している関数の名称
 static char *funcname;
@@ -209,7 +210,7 @@ void gen(Node *node) {
 
         // 関数を呼び出す前に、ABI に準拠するため RSP を16の倍数にしないといけない
         // 実行時に RSP の値を見て分岐するコードを生成することで対応する
-        int seq = labelseq++;
+        int seq = ++labelseq;
         // RSP と 15 のビット論理積を取り、ゼロなら16の倍数になっているのでそのまま
         // そうでなければ調整が必要
         printf("  mov rax, rsp\n");
@@ -262,7 +263,7 @@ void gen(Node *node) {
         printf("  push rax\n");
         return;
     case ND_LOGAND: {
-        int seq = labelseq++;
+        int seq = ++labelseq;
         // && は短絡の可能性がある
         // まず左側の式を計算しスタックトップに置く
         gen(node->lhs);
@@ -288,7 +289,7 @@ void gen(Node *node) {
     }
     case ND_LOGOR: {
         // LOGAND の場合と同じだが、1 のとき短絡する
-        int seq = labelseq++;
+        int seq = ++labelseq;
         gen(node->lhs);
         printf("  pop rax\n");
         printf("  cmp rax, 0\n");
@@ -305,7 +306,7 @@ void gen(Node *node) {
         return;
     }
     case ND_IF: {
-        int seq = labelseq++;
+        int seq = ++labelseq;
 
         // 条件式を評価しスタックトップに結果を入れる
         gen(node->cond);
@@ -337,7 +338,13 @@ void gen(Node *node) {
         return;
     }
     case ND_WHILE: {
-        int seq = labelseq++;
+        int seq = ++labelseq;
+        int brk = brkseq;
+        // この while の中で break した場合に飛ぶ先がわかるように
+        // このループに対応するラベルの番号を brkseq に控えておく
+        // brqseq の初期値は 0 のため、while/for の内部にいない場合は 0 になっている
+        brkseq = seq;
+
         // ループで戻って来るときのためのラベルを追加
         printf(".Lbegin%d:\n", seq);
         // 条件部を評価
@@ -345,14 +352,23 @@ void gen(Node *node) {
         printf("  pop rax\n");
         printf("  cmp rax, 0\n");
         // 条件を満たしたら末尾にジャンプ
-        printf("  je  .Lend%d\n", seq);
+        printf("  je  .L.break.%d\n", seq);
         gen(node->then);
         printf("  jmp .Lbegin%d\n", seq);
-        printf(".Lend%d:\n", seq);
+        printf(".L.break.%d:\n", seq);
+
+        // ループを抜けるときには、開始時に控えてあった元の brqseq の値に戻す
+        // ループがネストしたときの対応のため
+        //   while(){ while() {} break; }
+        // このとき break は外側の while から抜けなくてはいけない
+        brkseq = brk;
         return;
     }
     case ND_FOR: {
-        int seq = labelseq++;
+        int seq = ++labelseq;
+        int brk = brkseq;
+        brkseq = seq;
+
         if (node->init) {
             // ループに入る前に初期化部を実行
             gen(node->init);
@@ -364,7 +380,7 @@ void gen(Node *node) {
             // スタックトップから値を取り出して比較
             printf("  pop rax\n");
             printf("  cmp rax, 0\n");
-            printf("  je  .Lend%d\n", seq);
+            printf("  je  .L.break.%d\n", seq);
         }
         // ループ本体を実行
         gen(node->then);
@@ -373,7 +389,9 @@ void gen(Node *node) {
             gen(node->inc);
         }
         printf("  jmp  .Lbegin%d\n", seq);
-        printf(".Lend%d:\n", seq);
+        printf(".L.break.%d:\n", seq);
+
+        brkseq = brk;
         return;
     }
     case ND_BLOCK:
@@ -385,6 +403,13 @@ void gen(Node *node) {
         for (Node *n = node->body; n; n = n->next) {
             gen(n);
         }
+        return;
+    case ND_BREAK:
+        // for/while 文の中で再帰的に gen が呼ばれたなら 0 以外になっているはず 
+        if (brkseq == 0) {
+            error_tok(node->tok, "stray break");
+        }
+        printf("  jmp .L.break.%d\n", brkseq);
         return;
     case ND_VAR:
     case ND_MEMBER:

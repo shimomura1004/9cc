@@ -118,6 +118,7 @@ typedef enum {
     ND_FOR,         // "for"
     ND_SIZEOF,      // "sizeof"
     ND_BLOCK,       // "{ ... }"
+    ND_BREAK,       // "break"
     ND_FUNCALL,     // 関数呼び出し
     ND_EXPR_STMT,   // Expression のみの文
     ND_STMT_EXPR,   // ({ stmt+ }) 文を複数並べて最後の文が値になる (GNU C 拡張)

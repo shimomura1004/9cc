@@ -813,6 +813,7 @@ Node *read_expr_stmt() {
 //      | "if" "(" expr ")" stmt ("else" stmt)?
 //      | "while" "(" expr ")" stmt
 //      | "for" "(" ( expr? ";" | declaration ) expr? ";" expr? ")" stmt
+//      | "break" ";"
 //      | declaration
 Node *stmt() {
     Token *tok;
@@ -905,6 +906,11 @@ Node *stmt() {
         Node *node = new_node(ND_BLOCK, tok);
         node->body = head.next;
         return node;
+    }
+
+    if (tok = consume("break")) {
+        expect(";");
+        return new_node(ND_BREAK, tok);
     }
 
     if (is_typename()) {

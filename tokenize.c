@@ -124,6 +124,7 @@ char *starts_with_reserved(char *p) {
         "_Bool",
         "enum",
         "static",
+        "break",
     };
 
     for (int i=0; i < sizeof(kw) / sizeof(*kw); i++) {
