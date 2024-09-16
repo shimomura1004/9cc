@@ -126,6 +126,7 @@ char *starts_with_reserved(char *p) {
         "static",
         "break",
         "continue",
+        "goto",
     };
 
     for (int i=0; i < sizeof(kw) / sizeof(*kw); i++) {
@@ -147,7 +148,7 @@ char *starts_with_reserved_ops(char *p) {
         "+=", "-=", "*=", "/=",
         "&&", "||",
         "+", "-", "*", "&", "/", "(", ")", "<", ">", ";", "=",
-        "{", "}", ",", "[", "]", ".", ",", "!", "~", "|", "^",
+        "{", "}", ",", "[", "]", ".", ",", "!", "~", "|", "^", ":",
     };
 
     // Multi/single-letter punctuator

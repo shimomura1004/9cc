@@ -815,6 +815,8 @@ Node *read_expr_stmt() {
 //      | "for" "(" ( expr? ";" | declaration ) expr? ";" expr? ")" stmt
 //      | "break" ";"
 //      | "continue" ";"
+//      | "goto" ident ";"
+//      | ident ":" stmt
 //      | declaration
 Node *stmt() {
     Token *tok;
@@ -917,6 +919,26 @@ Node *stmt() {
     if (tok = consume("continue")) {
         expect(";");
         return new_node(ND_CONTINUE, tok);
+    }
+
+    if (tok = consume("goto")) {
+        Node *node = new_node(ND_GOTO, tok);
+        node->label_name = expect_ident();
+        expect(";");
+        return node;
+    }
+
+    if (tok = consume_ident()) {
+        if (consume(":")) {
+            Node *node = new_unary(ND_LABEL, stmt(), tok);
+            node->label_name = strndup(tok->str, tok->len);
+            return node;
+        }
+        // 識別子のあとに ":" がなかった場合(ラベルでなかった場合)は読んでしまったトークンを戻す
+        // 戻さないと、識別子で始まる式がパースできなくなる
+        // e.g., x = x + 1;
+        // 最初の x が consume_ident で消費されてしまう
+        token = tok;
     }
 
     if (is_typename()) {

@@ -120,6 +120,8 @@ typedef enum {
     ND_BLOCK,       // "{ ... }"
     ND_BREAK,       // "break"
     ND_CONTINUE,    // "continue"
+    ND_GOTO,        // "goto"
+    ND_LABEL,       // Labeled statement
     ND_FUNCALL,     // 関数呼び出し
     ND_EXPR_STMT,   // Expression のみの文
     ND_STMT_EXPR,   // ({ stmt+ }) 文を複数並べて最後の文が値になる (GNU C 拡張)
@@ -153,8 +155,10 @@ struct Node {
     char *funcname;     // 関数呼び出し
     Node *args;         // 関数引数
 
+    char *label_name;   // goto 文もしくはラベルで使う
+
     Var *var;           // kind が ND_VAR の場合のみ使う
-    long val;            // kind が ND_NUM の場合のみ使う
+    long val;           // kind が ND_NUM の場合のみ使う
 };
 
 // 関数の情報を保持する構造体

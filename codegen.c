@@ -431,6 +431,15 @@ void gen(Node *node) {
         }
         printf("  jmp .L.continue.%d\n", contseq);
         return;
+    case ND_GOTO:
+        // goto でジャンプできる先は同一関数内に限られるため
+        // 生成するラベル名には関数名を prefix として使えば十分
+        printf("  jmp .L.label.%s.%s\n", funcname, node->label_name);
+        return;
+    case ND_LABEL:
+        printf(".L.label.%s.%s:\n", funcname, node->label_name);
+        gen(node->lhs);
+        return;
     case ND_VAR:
     case ND_MEMBER:
         // 指定された変数に対応するアドレスをスタックトップにいれる
