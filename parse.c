@@ -814,6 +814,7 @@ Node *read_expr_stmt() {
 //      | "while" "(" expr ")" stmt
 //      | "for" "(" ( expr? ";" | declaration ) expr? ";" expr? ")" stmt
 //      | "break" ";"
+//      | "continue" ";"
 //      | declaration
 Node *stmt() {
     Token *tok;
@@ -911,6 +912,11 @@ Node *stmt() {
     if (tok = consume("break")) {
         expect(";");
         return new_node(ND_BREAK, tok);
+    }
+
+    if (tok = consume("continue")) {
+        expect(";");
+        return new_node(ND_CONTINUE, tok);
     }
 
     if (is_typename()) {

@@ -5,6 +5,7 @@ void gen(Node *node);
 // ユニークなラベルを作るための連番
 static int labelseq;
 static int brkseq;
+static int contseq;
 
 // 今コード生成している関数の名称
 static char *funcname;
@@ -340,13 +341,16 @@ void gen(Node *node) {
     case ND_WHILE: {
         int seq = ++labelseq;
         int brk = brkseq;
+        int cont = contseq;
+
         // この while の中で break した場合に飛ぶ先がわかるように
         // このループに対応するラベルの番号を brkseq に控えておく
         // brqseq の初期値は 0 のため、while/for の内部にいない場合は 0 になっている
         brkseq = seq;
+        contseq = seq;
 
         // ループで戻って来るときのためのラベルを追加
-        printf(".Lbegin%d:\n", seq);
+        printf(".L.continue.%d:\n", seq);
         // 条件部を評価
         gen(node->cond);
         printf("  pop rax\n");
@@ -354,7 +358,7 @@ void gen(Node *node) {
         // 条件を満たしたら末尾にジャンプ
         printf("  je  .L.break.%d\n", seq);
         gen(node->then);
-        printf("  jmp .Lbegin%d\n", seq);
+        printf("  jmp .L.continue.%d\n", seq);
         printf(".L.break.%d:\n", seq);
 
         // ループを抜けるときには、開始時に控えてあった元の brqseq の値に戻す
@@ -362,17 +366,23 @@ void gen(Node *node) {
         //   while(){ while() {} break; }
         // このとき break は外側の while から抜けなくてはいけない
         brkseq = brk;
+        contseq = cont;
         return;
     }
     case ND_FOR: {
         int seq = ++labelseq;
         int brk = brkseq;
+        int cont = contseq;
         brkseq = seq;
+        contseq = seq;
 
         if (node->init) {
             // ループに入る前に初期化部を実行
             gen(node->init);
         }
+        // while と違い、 begin と continue 用のラベルを分けている
+        // for の本体を実行したあとインクリメント部を実行する必要があるため
+        // continue はインクリメント部の直前にジャンプする必要がある
         printf(".Lbegin%d:\n", seq);
         if (node->cond) {
             // 条件部を評価しスタックトップにいれる
@@ -384,6 +394,9 @@ void gen(Node *node) {
         }
         // ループ本体を実行
         gen(node->then);
+
+        // continue 文でインクリメント部にジャンプしてこられるようにラベルを出力
+        printf(".L.continue.%d:\n", seq);
         if (node->inc) {
             // ループ本体が終了したら、インクリメント部を実行
             gen(node->inc);
@@ -392,6 +405,7 @@ void gen(Node *node) {
         printf(".L.break.%d:\n", seq);
 
         brkseq = brk;
+        contseq = cont;
         return;
     }
     case ND_BLOCK:
@@ -410,6 +424,12 @@ void gen(Node *node) {
             error_tok(node->tok, "stray break");
         }
         printf("  jmp .L.break.%d\n", brkseq);
+        return;
+    case ND_CONTINUE:
+        if (contseq == 0) {
+            error_tok(node->tok, "stray continue");
+        }
+        printf("  jmp .L.continue.%d\n", contseq);
         return;
     case ND_VAR:
     case ND_MEMBER:
