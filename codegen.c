@@ -3,7 +3,7 @@
 void gen(Node *node);
 
 // ユニークなラベルを作るための連番
-static int labelseq;
+static int labelseq = 1;
 static int brkseq;
 static int contseq;
 
@@ -211,7 +211,7 @@ void gen(Node *node) {
 
         // 関数を呼び出す前に、ABI に準拠するため RSP を16の倍数にしないといけない
         // 実行時に RSP の値を見て分岐するコードを生成することで対応する
-        int seq = ++labelseq;
+        int seq = labelseq++;
         // RSP と 15 のビット論理積を取り、ゼロなら16の倍数になっているのでそのまま
         // そうでなければ調整が必要
         printf("  mov rax, rsp\n");
@@ -264,7 +264,7 @@ void gen(Node *node) {
         printf("  push rax\n");
         return;
     case ND_LOGAND: {
-        int seq = ++labelseq;
+        int seq = labelseq++;
         // && は短絡の可能性がある
         // まず左側の式を計算しスタックトップに置く
         gen(node->lhs);
@@ -290,7 +290,7 @@ void gen(Node *node) {
     }
     case ND_LOGOR: {
         // LOGAND の場合と同じだが、1 のとき短絡する
-        int seq = ++labelseq;
+        int seq = labelseq++;
         gen(node->lhs);
         printf("  pop rax\n");
         printf("  cmp rax, 0\n");
@@ -307,7 +307,7 @@ void gen(Node *node) {
         return;
     }
     case ND_IF: {
-        int seq = ++labelseq;
+        int seq = labelseq++;
 
         // 条件式を評価しスタックトップに結果を入れる
         gen(node->cond);
@@ -339,7 +339,7 @@ void gen(Node *node) {
         return;
     }
     case ND_WHILE: {
-        int seq = ++labelseq;
+        int seq = labelseq++;
         int brk = brkseq;
         int cont = contseq;
 
@@ -370,7 +370,7 @@ void gen(Node *node) {
         return;
     }
     case ND_FOR: {
-        int seq = ++labelseq;
+        int seq = labelseq++;
         int brk = brkseq;
         int cont = contseq;
         brkseq = seq;
@@ -408,6 +408,60 @@ void gen(Node *node) {
         contseq = cont;
         return;
     }
+    case ND_SWITCH: {
+        int seq = labelseq++;
+        int brk = brkseq;
+        brkseq = seq;
+        node->case_label = seq;
+
+        // switch 文の条件部を評価して rax レジスタに取り出し
+        gen(node->cond);
+        printf("  pop rax\n");
+
+        // 複数の case 文を順番に変換していく
+        for (Node *n = node->case_next; n; n = n->case_next) {
+            // あとで case 文をパースするときに使うために Node を更新
+            // case ひとつひとつにユニークな数字を割り当て
+            n->case_label = labelseq++;
+            // switch の出口のラベルは共通で、最初に控えた seq を使う
+            n->case_end_label = seq;
+
+            // 比較してジャンプするコードを出力する
+            // val には式や変数ではなく(コンパイル時に確定する)数値が入っているので
+            // そのままアセンブラに出力することができる
+            printf("  cmp rax, %ld\n", n->val);
+            printf("  je .L.case.%d\n", n->case_label);
+        }
+
+        if (node->default_case) {
+            // default ラベルがあった場合
+            int i = labelseq++;
+            node->default_case->case_label = i;
+            node->default_case->case_end_label = seq;
+            // default は条件なしで必ずジャンプする
+            printf("  jmp .L.case.%d\n", i);
+        }
+        
+        // case 文にマッチせず、かつ default もない場合は switch を抜ける
+        printf("  jmp .L.break.%d\n", seq);
+
+        // switch 文の中身を出力
+        gen(node->then);
+
+        // switch を抜ける直前の位置にラベルを出力
+        printf(".L.break.%d:\n", seq);
+
+        brkseq = brk;
+        return;
+    }
+    case ND_CASE:
+        // まず switch 文の先頭からジャンプに使うラベルを出力
+        printf(".L.case.%d:\n", node->case_label);
+        gen(node->lhs);
+        // case 文の本文を処理し終えたら swtich 文の出口にジャンプ
+        // todo: break がなくても脱出してしまう、fall-through できない
+        printf("  jmp .L.break.%d\n", node->case_end_label);
+        return;
     case ND_BLOCK:
     case ND_STMT_EXPR:
         // stmt_expr の場合、最後のノードは必ず式になっている

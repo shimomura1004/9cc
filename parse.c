@@ -34,6 +34,8 @@ VarScope *var_scope;    // 今のスコープで定義されている変数の�
 TagScope *tag_scope;    // 今のスコープで定義されているタグのリスト
 int scope_depth;        // todo: 今のスコープのネストの深さ
 
+Node *current_switch;
+
 Scope *enter_scope() {
     Scope *sc = calloc(1, sizeof(Scope));
     sc->var_scope = var_scope;
@@ -811,6 +813,9 @@ Node *read_expr_stmt() {
 //      | "{" stmt* "}"
 //      | "return" expr ";"
 //      | "if" "(" expr ")" stmt ("else" stmt)?
+//      | "switch" "(" expr ")" stmt
+//      | "case" num ":" stmt
+//      | "default" ":" stmt
 //      | "while" "(" expr ")" stmt
 //      | "for" "(" ( expr? ";" | declaration ) expr? ";" expr? ")" stmt
 //      | "break" ";"
@@ -838,6 +843,63 @@ Node *stmt() {
         if (consume("else")) {
             node->els = stmt();
         }
+        return node;
+    }
+
+    // switch 文
+    if (tok = consume("switch")) {
+        Node *node = new_node(ND_SWITCH, tok);
+        expect("(");
+        node->cond = expr();
+        expect(")");
+
+        // switch 文がネストする場合に備え、今の switch 文のノードを控えておく
+        Node *sw = current_switch;
+        // switch 文の本体部をパース
+        // todo: 現状は、ブロックを使わずに case 文のあとに複数の文をつなげることができない
+        //   e.g., case 1: x += 1; y += 1; break;
+        //   とすると、 y += 1 は実行されない
+        current_switch = node;
+        node->then = stmt();
+        // switch 文のパースを終えたら戻す
+        current_switch = sw;
+        return node;
+    }
+
+    if (tok = consume("case")) {
+        if (!current_switch) {
+            // switch 文でないところで case がでてきたらエラー
+            error_tok(tok, "stray case");
+        }
+        // case 文に書けるのは数字のみ (式や変数はダメ)
+        int val = expect_number();
+        expect(":");
+
+        // case に対応する文をパース
+        Node *node = new_unary(ND_CASE, stmt(), tok);
+        // case の条件部に使う数値は val に入れる
+        node->val = val;
+        // switch 文では複数の case 文が並ぶことになるので、リストで表現
+        // current_switch->case_next には直前にパースした case 文のノードが入っている
+        // todo: このつなぎ方だと、後ろの case 文のほうが先頭にくる
+        //       C の規格だと同じ値を持った case 文は文法エラーなので問題ない
+        //       ただ現状は同じ値があってもエラーにならない
+        node->case_next = current_switch->case_next;
+        current_switch->case_next = node;
+        return node;
+    }
+
+    if (tok = consume("default")) {
+        if (!current_switch) {
+            error_tok(tok, "stray default");
+        }
+        expect(":");
+
+        Node *node = new_unary(ND_CASE, stmt(), tok);
+        // current_switch は今の switch 文のノードを指している
+        // コード生成時に使えるように、パース中の switch 文の default_case に
+        // default 文のノードへのポインタを保存する
+        current_switch->default_case = node;
         return node;
     }
 

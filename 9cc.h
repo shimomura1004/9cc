@@ -116,6 +116,8 @@ typedef enum {
     ND_IF,          // "if"
     ND_WHILE,       // "while"
     ND_FOR,         // "for"
+    ND_SWITCH,      // "switch"
+    ND_CASE,        // "case"
     ND_SIZEOF,      // "sizeof"
     ND_BLOCK,       // "{ ... }"
     ND_BREAK,       // "break"
@@ -156,6 +158,11 @@ struct Node {
     Node *args;         // 関数引数
 
     char *label_name;   // goto 文もしくはラベルで使う
+
+    Node *case_next;
+    Node *default_case;
+    int case_label;
+    int case_end_label;
 
     Var *var;           // kind が ND_VAR の場合のみ使う
     long val;           // kind が ND_NUM の場合のみ使う

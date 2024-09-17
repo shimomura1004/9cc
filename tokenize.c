@@ -127,6 +127,9 @@ char *starts_with_reserved(char *p) {
         "break",
         "continue",
         "goto",
+        "switch",
+        "case",
+        "default",
     };
 
     for (int i=0; i < sizeof(kw) / sizeof(*kw); i++) {
