@@ -233,10 +233,17 @@ void gen(Node *node) {
 
         // 戻り値は rax に入って戻って来る
         // 関数呼び出しの結果は関数の戻り値なので、それをスタックトップにいれる
+        // void 関数の場合でも rax の値(不定値)がスタックトップに入る
         printf("  push rax\n");
+        // もし戻り値が変数に代入されていたら、void 型の値を作ろうとしたのでエラーになる
+        // 代入などがなくただ関数を呼び出すためだったら EXPR_STMT ということになり
+        // その場合は EXPR_STMT で生成されるコードで値を捨てるので問題なし
 
-        // 関数の戻り値の型に合わせて丸める
-        truncate(node->ty);
+        if (node->ty->kind != TY_VOID) {
+            // 関数の戻り値の型に合わせて丸める
+            truncate(node->ty);
+        }
+
         return;
     }
     case ND_RETURN:
