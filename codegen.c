@@ -569,7 +569,9 @@ void gen(Node *node) {
     case ND_A_ADD:
     case ND_A_SUB:
     case ND_A_MUL:
-    case ND_A_DIV: {
+    case ND_A_DIV:
+    case ND_A_SHL:
+    case ND_A_SHR: {
         // x += y は  x = x + y と同じ
         // まず左辺値のアドレスを2つスタックトップに置く
         gen_lval(node->lhs);
@@ -605,6 +607,15 @@ void gen(Node *node) {
         case ND_A_DIV:
             printf("  cqo\n");
             printf("  idiv rdi\n");
+            break;
+        case ND_A_SHL:
+            printf("  mov cl, dil\n");
+            printf("  shl rax, cl\n");
+            break;
+        case ND_A_SHR:
+            printf("  mov cl, dil\n");
+            // 符号付のため SHR ではなく SAR を使う
+            printf("  sar rax, cl\n");
             break;
         }
 
@@ -676,6 +687,14 @@ void gen(Node *node) {
         break;
     case ND_BITXOR:
         printf("  xor rax, rdi\n");
+        break;
+    case ND_SHL:
+        printf("  mov cl, dil\n");
+        printf("  shl rax, cl\n");
+        break;
+    case ND_SHR:
+        printf("  mov cl, dil\n");
+        printf("  sar rax, cl\n");
         break;
     case ND_EQ:
         printf("  cmp rax, rdi\n");

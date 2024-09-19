@@ -90,6 +90,8 @@ typedef enum {
     ND_BITAND,      // &
     ND_BITOR,       // |
     ND_BITXOR,      // ^
+    ND_SHL,         // <<
+    ND_SHR,         // >>
     ND_ASSIGN,      // =
     ND_PRE_INC,     // pre ++
     ND_PRE_DEC,     // pre --
@@ -99,6 +101,8 @@ typedef enum {
     ND_A_SUB,       // -=
     ND_A_MUL,       // *=
     ND_A_DIV,       // /=
+    ND_A_SHL,       // <<=
+    ND_A_SHR,       // >>=
     ND_COMMA,       // ,
     ND_MEMBER,      // . 構造体のメンバアクセス
     ND_ADDR,        // 単項 &
