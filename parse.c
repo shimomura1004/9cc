@@ -171,6 +171,7 @@ Node *declaration();
 bool is_typename();
 Node *stmt();
 Node *expr();
+long const_expr();
 Node *assign();
 Node *conditional();
 Node *logor();
@@ -415,7 +416,7 @@ Type *abstract_declarator(Type *ty) {
     return type_suffix(ty);
 }
 
-// type-suffix = ( "[" num? "]" type-suffix)?
+// type-suffix = ( "[" const-expr? "]" type-suffix)?
 // 型の後置修飾語(配列の括弧)をパース(配列の要素数がない場合もある)
 Type *type_suffix(Type *ty) {
     if (!consume("[")) {
@@ -425,7 +426,7 @@ Type *type_suffix(Type *ty) {
     int sz = 0;
     bool is_incomplete = true;
     if (!consume("]")) {
-        sz = expect_number();
+        sz = const_expr();
         is_incomplete = false;
         expect("]");
     }
@@ -559,9 +560,8 @@ Type *struct_decl() {
     return ty;
 }
 
-// enum-specifier = "enum" ident
-//                | "enum" ident? "{" enum-list? "}"
-// enum-list = ident ("=" num)? ("," ident ("=" num)?)* ","?
+// enum-list = enum-elem ("," enum-elem)* ","?
+// enum-elem = ident ("=" const-expr)?
 Type *enum_specifier() {
     expect("enum");
     Type *ty = enum_type();
@@ -591,7 +591,7 @@ Type *enum_specifier() {
         char *name = expect_ident();
         // enum の定数値に値が指定されている場合
         if (consume("=")) {
-            cnt = expect_number();
+            cnt = const_expr();
         }
 
         // enum の定数名をスコープに加える
@@ -816,7 +816,7 @@ Node *read_expr_stmt() {
 //      | "return" expr ";"
 //      | "if" "(" expr ")" stmt ("else" stmt)?
 //      | "switch" "(" expr ")" stmt
-//      | "case" num ":" stmt
+//      | "case" const-expr ":" stmt
 //      | "default" ":" stmt
 //      | "while" "(" expr ")" stmt
 //      | "for" "(" ( expr? ";" | declaration ) expr? ";" expr? ")" stmt
@@ -874,7 +874,7 @@ Node *stmt() {
             error_tok(tok, "stray case");
         }
         // case 文に書けるのは数字のみ (式や変数はダメ)
-        int val = expect_number();
+        int val = const_expr();
         expect(":");
 
         // case に対応する文をパース
@@ -1025,6 +1025,59 @@ Node *expr() {
         node = new_binary(ND_COMMA, node, assign(), tok); 
     }
     return node;
+}
+
+long eval(Node *node) {
+    // 定数式はコンパイル時に評価(eval)してしまう
+    switch(node->kind) {
+    case ND_ADD:
+        return eval(node->lhs) + eval(node->rhs);
+    case ND_SUB:
+        return eval(node->lhs) - eval(node->rhs);
+    case ND_MUL:
+        return eval(node->lhs) * eval(node->rhs);
+    case ND_DIV:
+        return eval(node->lhs) / eval(node->rhs);
+    case ND_BITAND:
+        return eval(node->lhs) & eval(node->rhs);
+    case ND_BITOR:
+        return eval(node->lhs) | eval(node->rhs);
+    case ND_BITXOR:
+        return eval(node->lhs) ^ eval(node->rhs);
+    case ND_SHL:
+        return eval(node->lhs) << eval(node->rhs);
+    case ND_SHR:
+        return eval(node->lhs) >> eval(node->rhs);
+    case ND_EQ:
+        return eval(node->lhs) == eval(node->rhs);
+    case ND_NE:
+        return eval(node->lhs) != eval(node->rhs);
+    case ND_LT:
+        return eval(node->lhs) < eval(node->rhs);
+    case ND_LE:
+        return eval(node->lhs) <= eval(node->rhs);
+    case ND_TERNARY:
+        return eval(node->cond) ? eval(node->then) : eval(node->els);
+    case ND_COMMA:
+        // 左辺は const 式なので副作用がない、つまり評価する必要がない
+        return eval(node->rhs);
+    case ND_NOT:
+        return !eval(node->lhs);
+    case ND_BITNOT:
+        return ~eval(node->lhs);
+    case ND_LOGAND:
+        return eval(node->lhs) && eval(node->rhs);
+    case ND_LOGOR:
+        return eval(node->lhs) || eval(node->rhs);
+    case ND_NUM:
+        return node->val;
+    }
+fprintf(stderr, "kind: %d\n", node->kind);
+    error_tok(node->tok, "not a constant expression");
+}
+
+long const_expr() {
+    return eval(conditional());
 }
 
 // assign    = conditional (assign-op assign)?
