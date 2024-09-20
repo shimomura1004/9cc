@@ -216,6 +216,9 @@ void visit(Node *node) {
         // ビット反転した結果は、元々の型と同じ
         node->ty = node->lhs->ty;
         return;
+    case ND_TERNARY:
+        node->ty = node->then->ty;
+        return;
     case ND_COMMA:
         // コンマでつながっている場合は右側の式の型が全体の型になる
         node->ty = node->rhs->ty;

@@ -93,6 +93,7 @@ typedef enum {
     ND_SHL,         // <<
     ND_SHR,         // >>
     ND_ASSIGN,      // =
+    ND_TERNARY,     // ?:
     ND_PRE_INC,     // pre ++
     ND_PRE_DEC,     // pre --
     ND_POST_INC,    // post ++

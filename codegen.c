@@ -520,6 +520,19 @@ void gen(Node *node) {
         // スタックに入っている値を、スタックに入っているアドレスに保存
         store(node->ty);
         return;
+    case ND_TERNARY: {
+        int seq = labelseq++;
+        gen(node->cond);
+        printf("  pop rax\n");
+        printf("  cmp rax, 0\n");
+        printf("  je  .Lelse%d\n", seq);
+        gen(node->then);
+        printf("  jmp .Lend%d\n", seq);
+        printf(".Lelse%d:\n", seq);
+        gen(node->els);
+        printf(".Lend%d:\n", seq);
+        return;
+    }
     case ND_PRE_INC:
         // まずインクリメントの対象となっている式のアドレスを計算してスタックトップに置く
         gen_lval(node->lhs);
