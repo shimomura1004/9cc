@@ -8,9 +8,31 @@ static char *node_names[] = {
     "SUB",
     "MUL",
     "DIV",
+    "BITAND",
+    "BITOR",
+    "BITXOR",
+    "SHL",
+    "SHR",
     "ASSIGN",
+    "TERNARY",
+    "PRE_INC",
+    "PRE_DEC",
+    "POST_INC",
+    "POST_DEC",
+    "A_ADD",
+    "A_SUB",
+    "A_MUL",
+    "A_DIV",
+    "A_SHL",
+    "A_SHR",
+    "COMMA",
+    "MEMBER",
     "ADDR",
     "DEREF",
+    "NOT",
+    "BITNOT",
+    "LOGAND",
+    "LOGOR",
     "VAR",
     "EQ",
     "NE",
@@ -20,12 +42,19 @@ static char *node_names[] = {
     "IF",
     "WHILE",
     "FOR",
+    "SWITCH",
+    "CASE",
     "SIZEOF",
     "BLOCK",
+    "BREAK",
+    "CONTINUE",
+    "GOTO",
+    "LABEL",
     "FUNCALL",
     "EXPR_STMT",
     "STMT_EXPR",
     "NUM",
+    "CAST",
     "NULL",
 };
 
@@ -71,11 +100,26 @@ void print_type(Type *ty) {
     }
 
     switch (ty->kind) {
+    case TY_VOID:
+        fprintf(stderr, "void");
+        return;
+    case TY_BOOL:
+        fprintf(stderr, "bool");
+        return;
     case TY_CHAR:
         fprintf(stderr, "char");
         return;
+    case TY_SHORT:
+        fprintf(stderr, "short");
+        return;
     case TY_INT:
         fprintf(stderr, "int");
+        return;
+    case TY_LONG:
+        fprintf(stderr, "long");
+        return;
+    case TY_ENUM:
+        fprintf(stderr, "enum");
         return;
     case TY_ARRAY:
         print_type(ty->base);
@@ -84,6 +128,12 @@ void print_type(Type *ty) {
     case TY_PTR:
         print_type(ty->base);
         fprintf(stderr, "*");
+        return;
+    case TY_STRUCT:
+        fprintf(stderr, "struct");
+        return;
+    case TY_FUNC:
+        fprintf(stderr, "func");
         return;
     default:
         fprintf(stderr, "???");
