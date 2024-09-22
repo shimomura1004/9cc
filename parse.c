@@ -785,6 +785,21 @@ Node *new_desg_node(Var *var, Designator *desg, Node *rhs) {
     return new_unary(ND_EXPR_STMT, node, rhs->tok);
 }
 
+Node *lvar_init_zero(Node *cur, Var *var, Type *ty, Designator *desg) {
+    if (ty->kind == TY_ARRAY) {
+        // 配列の中身が丸々ない場合は再帰して 0 埋め
+        for (int i = 0; i < ty->array_size; i++) {
+            Designator desg2 = {desg, i++};
+            cur = lvar_init_zero(cur, var, ty->base, &desg2);
+        }
+        return cur;
+    }
+
+    // 通常の要素であれば new_desg_node を使って 0 埋めする
+    cur->next = new_desg_node(var, desg, new_num(0, token));
+    return cur->next;
+}
+
 // ローカル変数への初期化リスト
 // lvar-initializer = assign
 //                  | "{" lvar-initializer ("," lvar-initializer)* ","? "}"
@@ -796,6 +811,7 @@ Node *new_desg_node(Var *var, Designator *desg, Node *rhs) {
 // x[1][0] = 4;
 // x[1][1] = 5;
 // x[1][2] = 6;
+// もし初期化リストが配列の長さより短かったら、余った分は 0 で初期化する
 Node *lvar_initializer(Node *cur, Var *var, Type *ty, Designator *desg) {
     Token *tok = consume("{");
     if (!tok) {
@@ -825,6 +841,12 @@ Node *lvar_initializer(Node *cur, Var *var, Type *ty, Designator *desg) {
         } while(!peek_end() && consume(","));
 
         expect_end();
+
+        // 初期化リストをパースし終わっても i が配列サイズに満たない場合は 0 で埋めていく
+        while (i < ty->array_size) {
+            Designator desg2 = {desg, i++};
+            cur = lvar_init_zero(cur, var, ty->base, &desg2);
+        }
         return cur;
     }
 
