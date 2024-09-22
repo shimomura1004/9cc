@@ -168,11 +168,32 @@ void print_node(Node *node, int depth) {
         case ND_NE:
         case ND_LT:
         case ND_ASSIGN:
+        case ND_A_ADD:
+        case ND_A_SUB:
+        case ND_A_MUL:
+        case ND_A_DIV:
+        case ND_A_SHL:
+        case ND_A_SHR:
+        case ND_BITAND:
+        case ND_BITOR:
+        case ND_BITXOR:
+        case ND_SHL:
+        case ND_SHR:
+        case ND_LOGAND:
+        case ND_LOGOR:
+        case ND_COMMA:
             print_binary_node(node, depth);
             break;
         case ND_ADDR:
         case ND_DEREF:
         case ND_RETURN:
+        case ND_PRE_INC:
+        case ND_PRE_DEC:
+        case ND_POST_INC:
+        case ND_POST_DEC:
+        case ND_NOT:
+        case ND_BITNOT:
+        case ND_CAST:
             print_unary_node(node, depth);
             break;
         case ND_VAR:
@@ -189,42 +210,79 @@ void print_node(Node *node, int depth) {
             }
             fprintf(stderr, "\n");
             break;
+        case ND_MEMBER:
+            fprintf(stderr, "%*sMEMBER %s : [\n", depth, " ", node->member_name);
+            print_node(node->lhs, depth + 2);
+            fprintf(stderr, "%*s]\n", depth, " ");
+            break;
+        case ND_TERNARY:
+            fprintf(stderr, "%*sTERNARY [\n", depth, " ");
+            fprintf(stderr, "%*sCOND\n", depth + 2, " ");
+            print_node(node->cond, depth + 4);
+            fprintf(stderr, "%*sTHEN\n", depth + 2, " ");
+            print_node(node->then, depth + 4);
+            fprintf(stderr, "%*sELSE\n", depth + 2, " ");
+            print_node(node->els, depth + 4);
+            fprintf(stderr, "%*s]\n", depth, " ");
+            break;
         case ND_IF:
             fprintf(stderr, "%*sIF [\n", depth, " ");
-            fprintf(stderr, "%*sCOND\n", depth, " ");
-            print_node(node->cond, depth + 2);
-            fprintf(stderr, "%*sTHEN\n", depth, " ");
-            print_node(node->then, depth + 2);
+            fprintf(stderr, "%*sCOND\n", depth + 2, " ");
+            print_node(node->cond, depth + 4);
+            fprintf(stderr, "%*sTHEN\n", depth + 2, " ");
+            print_node(node->then, depth + 4);
             if (node->els) {
-                fprintf(stderr, "%*sELSE\n", depth, " ");
-                print_node(node->els, depth + 2);
+                fprintf(stderr, "%*sELSE\n", depth + 2, " ");
+                print_node(node->els, depth + 4);
             }
             fprintf(stderr, "%*s]\n", depth, " ");
             break;
         case ND_WHILE:
             fprintf(stderr, "%*sWHILE [\n", depth, " ");
-            fprintf(stderr, "%*sCOND\n", depth, " ");
-            print_node(node->cond, depth + 2);
-            fprintf(stderr, "%*sBODY\n", depth, " ");
-            print_node(node->then, depth + 2);
+            fprintf(stderr, "%*sCOND\n", depth + 2, " ");
+            print_node(node->cond, depth + 4);
+            fprintf(stderr, "%*sBODY\n", depth + 2, " ");
+            print_node(node->then, depth + 4);
             fprintf(stderr, "%*s]\n", depth, " ");
             break;
         case ND_FOR:
             fprintf(stderr, "%*sFOR [\n", depth, " ");
             if (node->init) {
-                fprintf(stderr, "%*sINIT\n", depth, " ");
-                print_node(node->init, depth + 2);
+                fprintf(stderr, "%*sINIT\n", depth + 2, " ");
+                print_node(node->init, depth + 4);
             }
             if (node->cond) {
-                fprintf(stderr, "%*sCOND\n", depth, " ");
-                print_node(node->cond, depth + 2);
+                fprintf(stderr, "%*sCOND\n", depth + 2, " ");
+                print_node(node->cond, depth + 4);
             }
             if (node->inc) {
-                fprintf(stderr, "%*sINC\n", depth, " ");
-                print_node(node->inc, depth + 2);
+                fprintf(stderr, "%*sINC\n", depth + 2, " ");
+                print_node(node->inc, depth + 4);
             }
-            fprintf(stderr, "%*sBODY\n", depth, " ");
-            print_node(node->then, depth + 2);
+            fprintf(stderr, "%*sBODY\n", depth + 2, " ");
+            print_node(node->then, depth + 4);
+            fprintf(stderr, "%*s]\n", depth, " ");
+            break;
+        case ND_BREAK:
+            fprintf(stderr, "%*sBREAK\n", depth, " ");
+            break;
+        case ND_CONTINUE:
+            fprintf(stderr, "%*sCONTINUE\n", depth, " ");
+            break;
+        case ND_GOTO:
+            fprintf(stderr, "%*sGOTO %s\n", depth, " ", node->label_name);
+            break;
+        case ND_SWITCH:
+            fprintf(stderr, "%*sSWITCH [\n", depth, " ");
+            fprintf(stderr, "%*sCOND\n", depth + 2, " ");
+            print_node(node->cond, depth + 4);
+            fprintf(stderr, "%*sBODY\n", depth + 2, " ");
+            print_node(node->then, depth + 4);
+            fprintf(stderr, "%*s]\n", depth, " ");
+            break;
+        case ND_CASE:
+            fprintf(stderr, "%*sCASE %ld [\n", depth, " ", node->val);
+            print_node(node->lhs, depth + 2);
             fprintf(stderr, "%*s]\n", depth, " ");
             break;
         case ND_BLOCK:
@@ -232,6 +290,11 @@ void print_node(Node *node, int depth) {
             for (Node *n = node->body; n; n = n->next) {
                 print_node(n, depth + 2);
             }
+            fprintf(stderr, "%*s]\n", depth, " ");
+            break;
+        case ND_LABEL:
+            fprintf(stderr, "%*sLABEL %s [\n", depth, " ", node->label_name);
+            print_node(node->lhs, depth + 2);
             fprintf(stderr, "%*s]\n", depth, " ");
             break;
         case ND_STMT_EXPR:
