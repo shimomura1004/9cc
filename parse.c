@@ -723,6 +723,26 @@ Function *function() {
     return fn;
 }
 
+// 初期化リストの末尾にいるかどうかを判定する
+// 初期化リストは "}" か ",}" で終わる
+bool peek_end() {
+    Token *tok = token;
+    bool ret = consume("}") || (consume(",") && consume("}"));
+    // 消費したトークンを戻す
+    token = tok;
+    return ret;
+}
+
+// 初期化リストの末尾をパース
+void expect_end() {
+    Token *tok = token;
+    if (consume(",") && consume("}")) {
+        return;
+    }
+    token = tok;
+    expect("}");
+}
+
 // global-var = type-specifier declarator type-suffix ";"
 void global_var() {
     Type *ty = type_specifier();
@@ -736,7 +756,82 @@ void global_var() {
     push_scope(name)->var = var;
 }
 
-// declaration = type-specifier declarator type-suffix ("=" expr)? ";"
+typedef struct Designator Designator;
+
+struct Designator {
+    Designator *next;
+    int idx;
+};
+
+Node *new_desg_node2(Var *var, Designator *desg) {
+    Token *tok = var->tok;
+    if (!desg) {
+        // 初期化がネストしていない場合、つまりただの変数への代入の場合
+        return new_var(var, tok);
+    }
+
+    // 配列の初期化の場合、再帰
+    Node *node = new_desg_node2(var, desg->next);
+
+    // ネストした初期化リストの処理を終えたら、インデックスをひとつ進める
+    node = new_binary(ND_ADD, node, new_num(desg->idx, tok), tok);
+    return new_unary(ND_DEREF, node, tok);
+}
+
+Node *new_desg_node(Var *var, Designator *desg, Node *rhs) {
+    Node *lhs = new_desg_node2(var, desg);
+    // 代入式を作る
+    Node *node = new_binary(ND_ASSIGN, lhs, rhs, rhs->tok);
+    return new_unary(ND_EXPR_STMT, node, rhs->tok);
+}
+
+// ローカル変数への初期化リスト
+// lvar-initializer = assign
+//                  | "{" lvar-initializer ("," lvar-initializer)* ","? "}"
+// ローカル変数への初期化リストは、複数の代入文として扱う
+// x[2][3] = {{1, 2, 3}, {4, 5, 6}} は以下のようなコードとして扱う
+// x[0][0] = 1;
+// x[0][1] = 2;
+// x[0][2] = 3;
+// x[1][0] = 4;
+// x[1][1] = 5;
+// x[1][2] = 6;
+Node *lvar_initializer(Node *cur, Var *var, Type *ty, Designator *desg) {
+    Token *tok = consume("{");
+    if (!tok) {
+        // 配列の初期化ではなく、単一の変数の初期化の場合
+        // desg には親要素の情報が入っている
+        // assign でパースしているのは、初期化に使える式の最上位だから
+        //   int a; int x[1] = {a += 2};
+        // みたいな初期化を可能にするため
+        // assign で int x[3] = {1,2,3} の全体の代入文をパースしているわけではない
+        // 上記の式の場合、assign() を呼ぶと初回は 1 だけをパースする
+        cur->next = new_desg_node(var, desg, assign());
+        return cur->next;
+    }
+
+    if (ty->kind == TY_ARRAY) {
+        // 初期化リストの場合、必ず1つ以上の lvar-initializer がある
+        // 配列の何番目の初期化値かを管理するインデックス
+        int i = 0;
+
+        do {
+            Designator desg2 = {desg, i++};
+            // 2次元以上の配列に対してネストした初期化リストが指定され得るので再帰呼び出し
+            // ネストする場合、desg2 の中に親要素の情報を入れて子要素のパースに使う
+            // lvar_initializer は新たに作ったノードを返すので
+            // cur に入れなおすことでリンクリストになる
+            cur = lvar_initializer(cur, var, ty->base, &desg2);
+        } while(!peek_end() && consume(","));
+
+        expect_end();
+        return cur;
+    }
+
+    error_tok(tok, "invalid array initializer");
+}
+
+// declaration = type-specifier declarator type-suffix ("=" lvar-initializer)? ";"
 //             | type-specifier ";"
 Node *declaration() {
     Token *tok;
@@ -792,11 +887,17 @@ Node *declaration() {
     // 初期値がある場合は代入文になる
     expect("=");
 
-    Node *lhs = new_var(var, tok);
-    Node *rhs = expr();
+    Node head;
+    head.next = NULL;
+    // head は初期化値のリスト、var は初期化される変数
+    // 初期化のためのノードの配列で head が更新される
+    lvar_initializer(&head, var, var->ty, NULL);
     expect(";");
-    Node *node = new_binary(ND_ASSIGN, lhs, rhs, tok);
-    return new_unary(ND_EXPR_STMT, node, tok);
+
+    // 配列を初期化する場合、代入文が複数生成される可能性があるのでブロックにする
+    Node *node = new_node(ND_BLOCK, tok);
+    node->body = head.next;
+    return node;
 }
 
 bool is_typename() {
@@ -1072,7 +1173,7 @@ long eval(Node *node) {
     case ND_NUM:
         return node->val;
     }
-fprintf(stderr, "kind: %d\n", node->kind);
+
     error_tok(node->tok, "not a constant expression");
 }
 
