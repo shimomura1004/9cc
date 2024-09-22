@@ -294,6 +294,12 @@ void print_global_variables(VarList *vl) {
     for (; vl; vl = vl->next) {
         fprintf(stderr, "VAR %s : ",vl->var->name);
         print_type(vl->var->ty);
+
+        // todo: char* 以外の変数も出力したい
+        if (vl->var->ty->kind == TY_ARRAY && vl->var->ty->base->kind == TY_CHAR) {
+            fprintf(stderr, " = \"%s\"", vl->var->contents);
+        }
+
         fprintf(stderr, "\n");
     }
 }
