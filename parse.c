@@ -789,7 +789,7 @@ Node *lvar_init_zero(Node *cur, Var *var, Type *ty, Designator *desg) {
     if (ty->kind == TY_ARRAY) {
         // 配列の中身が丸々ない場合は再帰して 0 埋め
         for (int i = 0; i < ty->array_size; i++) {
-            Designator desg2 = {desg, i++};
+            Designator desg2 = {desg, i};
             cur = lvar_init_zero(cur, var, ty->base, &desg2);
         }
         return cur;
