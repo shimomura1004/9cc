@@ -374,3 +374,40 @@ void print_ast(Program *prog) {
     print_functions(prog->fns);
     fprintf(stderr, "--------------------------------\n");
 }
+
+// verror_at と同じ実装
+static Token *previous_token;
+void print_source_code(Token *tok) {
+    if (!tok) {
+        return;
+    }
+
+    if (previous_token == tok) {
+        return;
+    }
+    previous_token = tok;
+
+    char *line = tok->str;
+    while (user_input < line && line[-1] != '\n') {
+        line--;
+    }
+
+    char *end = tok->str;
+    while (*end != '\n') {
+        end++;
+    }
+
+    int line_num = 1;
+    for (char *p = user_input; p < line; p++) {
+        if (*p == '\n') {
+            line_num++;
+        }
+    }
+
+    printf("# ");
+    int indent = printf("%s:%d: ", filename, line_num);
+    printf("%.*s\n", (int)(end - line), line);
+
+    int pos = tok->str - line + indent;
+    printf("# %*s^\n", pos, "");
+}

@@ -4,5 +4,6 @@
 #include "9cc.h"
 
 void print_ast(Program *prog);
+void print_source_code(Token *tok);
 
 #endif

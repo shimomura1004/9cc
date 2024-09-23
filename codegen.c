@@ -1,4 +1,7 @@
 #include "9cc.h"
+#ifdef DEBUG
+#include "utility.h"
+#endif
 
 void gen(Node *node);
 
@@ -173,6 +176,10 @@ void gen_lval(Node *node) {
 }
 
 void gen(Node *node) {
+#ifdef DEBUG
+    print_source_code(node->tok);
+#endif
+
     switch (node->kind) {
     case ND_NULL:
         return;
