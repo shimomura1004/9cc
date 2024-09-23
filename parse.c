@@ -813,11 +813,20 @@ Node *lvar_init_zero(Node *cur, Var *var, Type *ty, Designator *desg) {
 // x[1][2] = 6;
 // もし初期化リストが配列の長さより短かったら、余った分は 0 で初期化する
 // 初期化リストが文字列リテラルで与えられたら、文字のリストとして扱う
-// e.g., char x[4] = "foo" は char x[4] = {'f', 'o', 'o', '\0'}
+//   e.g., char x[4] = "foo" は char x[4] = {'f', 'o', 'o', '\0'}
+// 初期化リストが与えられている場合は、配列宣言が incomplete でもよい
+//   e.g., char x[] = {1,2,3}
 Node *lvar_initializer(Node *cur, Var *var, Type *ty, Designator *desg) {
     if (ty->kind == TY_ARRAY && ty->base->kind == TY_CHAR && token->kind == TK_STR) {
+        // 文字列リテラルによる初期化
         Token *tok = token;
         token = token->next;
+
+        if (ty->is_incomplete) {
+            // incomplete だったら初期化リストの長さを配列の長さにする
+            ty->array_size = tok->cont_len;
+            ty->is_incomplete = false;
+        }
 
         // 配列のサイズと初期化する文字列のサイズで、小さいほうにそろえる
         int len = (ty->array_size < tok->cont_len) ? ty->array_size : tok->cont_len;
@@ -840,6 +849,7 @@ Node *lvar_initializer(Node *cur, Var *var, Type *ty, Designator *desg) {
         return cur;
     }
 
+    // 通常の初期化リストによる初期化
     Token *tok = consume("{");
     if (!tok) {
         // 配列の初期化ではなく、単一の変数の初期化の場合
@@ -874,6 +884,13 @@ Node *lvar_initializer(Node *cur, Var *var, Type *ty, Designator *desg) {
             Designator desg2 = {desg, i++};
             cur = lvar_init_zero(cur, var, ty->base, &desg2);
         }
+
+        if (ty->is_incomplete) {
+            // incomplete な場合、初期化リストの長さを配列の長さにする
+            ty->array_size = i;
+            ty->is_incomplete = false;
+        }
+
         return cur;
     }
 

@@ -32,8 +32,8 @@ struct Token {
     char *str;          // トークンの文字列
     int len;            // 文字列長
 
-    char *contents;     // 文字列リテラルの中身(NULL 文字を含む)
-    char cont_len;      // 文字列リテラルの長さ
+    char *contents;     // トークンが文字列リテラルの場合、その文字列(NULL 文字を含む)
+    char cont_len;      // トークンが文字列リテラルの場合、その文字列の長さ
 };
 
 // 変数の型
