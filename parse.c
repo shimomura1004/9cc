@@ -812,7 +812,34 @@ Node *lvar_init_zero(Node *cur, Var *var, Type *ty, Designator *desg) {
 // x[1][1] = 5;
 // x[1][2] = 6;
 // もし初期化リストが配列の長さより短かったら、余った分は 0 で初期化する
+// 初期化リストが文字列リテラルで与えられたら、文字のリストとして扱う
+// e.g., char x[4] = "foo" は char x[4] = {'f', 'o', 'o', '\0'}
 Node *lvar_initializer(Node *cur, Var *var, Type *ty, Designator *desg) {
+    if (ty->kind == TY_ARRAY && ty->base->kind == TY_CHAR && token->kind == TK_STR) {
+        Token *tok = token;
+        token = token->next;
+
+        // 配列のサイズと初期化する文字列のサイズで、小さいほうにそろえる
+        int len = (ty->array_size < tok->cont_len) ? ty->array_size : tok->cont_len;
+        int i;
+
+        // トークン内の文字列を一文字ずつにわけて通常通り初期化する
+        for (i = 0; i < len; i++) {
+            Designator desg2 = {desg, i};
+            Node *rhs = new_num(tok->contents[i], tok);
+            cur->next = new_desg_node(var, &desg2, rhs);
+            cur = cur->next;
+        }
+
+        // 配列の残りの部分がある場合は 0 で初期化する
+        for (; i < ty->array_size; i++) {
+            Designator desg2 = {desg, i};
+            cur = lvar_init_zero(cur, var, ty->base, &desg2);
+        }
+
+        return cur;
+    }
+
     Token *tok = consume("{");
     if (!tok) {
         // 配列の初期化ではなく、単一の変数の初期化の場合
