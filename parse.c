@@ -760,25 +760,38 @@ typedef struct Designator Designator;
 
 struct Designator {
     Designator *next;
-    int idx;
+    int idx;            // for array
+    Member *mem;        // for struct
 };
 
+// 配列や構造体を初期化する際の左辺値を作る
 Node *new_desg_node2(Var *var, Designator *desg) {
     Token *tok = var->tok;
     if (!desg) {
         // 初期化がネストしていない場合、つまりただの変数への代入の場合
+        // 配列でも構造体でも処理は同じ
         return new_var(var, tok);
     }
 
     // 配列の初期化の場合、再帰
     Node *node = new_desg_node2(var, desg->next);
+    // この段階で、node には初期化対象の配列の要素や構造体のメンバの変数が入っている
 
-    // ネストした初期化リストの処理を終えたら、インデックスをひとつ進める
+    if (desg->mem) {
+        // 初期化対象が構造体メンバの場合は、メンバへアクセスするコードを生成する
+        node = new_unary(ND_MEMBER, node, desg->mem->tok);
+        node->member_name = desg->mem->name;
+        return node;
+    }
+
+    // 初期化対象が配列の要素の場合は、要素のインデックス分ずらした場所を deref すればいい
+    // x[2] = 1 だったら、パース結果は *(x+2) = 1 という式になるということ
     node = new_binary(ND_ADD, node, new_num(desg->idx, tok), tok);
     return new_unary(ND_DEREF, node, tok);
 }
 
 Node *new_desg_node(Var *var, Designator *desg, Node *rhs) {
+    // 配列の要素や構造体のメンバを左辺値として取り出し
     Node *lhs = new_desg_node2(var, desg);
     // 代入式を作る
     Node *node = new_binary(ND_ASSIGN, lhs, rhs, rhs->tok);
@@ -789,7 +802,7 @@ Node *lvar_init_zero(Node *cur, Var *var, Type *ty, Designator *desg) {
     if (ty->kind == TY_ARRAY) {
         // 配列の中身が丸々ない場合は再帰して 0 埋め
         for (int i = 0; i < ty->array_size; i++) {
-            Designator desg2 = {desg, i};
+            Designator desg2 = {desg, i, NULL};
             cur = lvar_init_zero(cur, var, ty->base, &desg2);
         }
         return cur;
@@ -803,6 +816,9 @@ Node *lvar_init_zero(Node *cur, Var *var, Type *ty, Designator *desg) {
 // ローカル変数への初期化リスト
 // lvar-initializer = assign
 //                  | "{" lvar-initializer ("," lvar-initializer)* ","? "}"
+// 配列や構造体がネストしている場合、この lvar_initializer が再帰して動作する
+// lvar_initializer 内で呼び出している new_desg_node は、
+// 配列の要素1つや構造体メンバ1つに対して1回呼び出される
 // ローカル変数への初期化リストは、複数の代入文として扱う
 // x[2][3] = {{1, 2, 3}, {4, 5, 6}} は以下のようなコードとして扱う
 // x[0][0] = 1;
@@ -811,6 +827,10 @@ Node *lvar_init_zero(Node *cur, Var *var, Type *ty, Designator *desg) {
 // x[1][0] = 4;
 // x[1][1] = 5;
 // x[1][2] = 6;
+// 構造体の初期化の場合は
+// struct { int a; int b; } x = {1, 2} は以下のようなコードとして扱う
+// x.a = 1;
+// x.b = 2;
 // もし初期化リストが配列の長さより短かったら、余った分は 0 で初期化する
 // 初期化リストが文字列リテラルで与えられたら、文字のリストとして扱う
 //   e.g., char x[4] = "foo" は char x[4] = {'f', 'o', 'o', '\0'}
@@ -834,7 +854,7 @@ Node *lvar_initializer(Node *cur, Var *var, Type *ty, Designator *desg) {
 
         // トークン内の文字列を一文字ずつにわけて通常通り初期化する
         for (i = 0; i < len; i++) {
-            Designator desg2 = {desg, i};
+            Designator desg2 = {desg, i, NULL};
             Node *rhs = new_num(tok->contents[i], tok);
             cur->next = new_desg_node(var, &desg2, rhs);
             cur = cur->next;
@@ -842,7 +862,7 @@ Node *lvar_initializer(Node *cur, Var *var, Type *ty, Designator *desg) {
 
         // 配列の残りの部分がある場合は 0 で初期化する
         for (; i < ty->array_size; i++) {
-            Designator desg2 = {desg, i};
+            Designator desg2 = {desg, i, NULL};
             cur = lvar_init_zero(cur, var, ty->base, &desg2);
         }
 
@@ -852,7 +872,7 @@ Node *lvar_initializer(Node *cur, Var *var, Type *ty, Designator *desg) {
     // 通常の初期化リストによる初期化
     Token *tok = consume("{");
     if (!tok) {
-        // 配列の初期化ではなく、単一の変数の初期化の場合
+        // 配列や構造体の初期化ではなく、単一の変数の初期化の場合
         // desg には親要素の情報が入っている
         // assign でパースしているのは、初期化に使える式の最上位だから
         //   int a; int x[1] = {a += 2};
@@ -869,7 +889,7 @@ Node *lvar_initializer(Node *cur, Var *var, Type *ty, Designator *desg) {
         int i = 0;
 
         do {
-            Designator desg2 = {desg, i++};
+            Designator desg2 = {desg, i++, NULL};
             // 2次元以上の配列に対してネストした初期化リストが指定され得るので再帰呼び出し
             // ネストする場合、desg2 の中に親要素の情報を入れて子要素のパースに使う
             // lvar_initializer は新たに作ったノードを返すので
@@ -889,6 +909,27 @@ Node *lvar_initializer(Node *cur, Var *var, Type *ty, Designator *desg) {
             // incomplete な場合、初期化リストの長さを配列の長さにする
             ty->array_size = i;
             ty->is_incomplete = false;
+        }
+
+        return cur;
+    }
+
+    if (ty->kind = TY_STRUCT) {
+        Member *mem = ty->members;
+
+        do {
+            Designator desg2 = {desg, 0, mem};
+            // メンバ1つを初期化するコードを生成
+            cur = lvar_initializer(cur, var, mem->ty, &desg2);
+            mem = mem->next;
+        } while (!peek_end() && consume(","));
+
+        expect_end();
+
+        // もし初期化されていないメンバが残っていたら 0 で初期化
+        for (; mem; mem = mem->next) {
+            Designator desg2 = {desg, 0, mem};
+            cur = lvar_init_zero(cur, var, mem->ty, &desg2);
         }
 
         return cur;
