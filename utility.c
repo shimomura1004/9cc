@@ -58,38 +58,56 @@ static char *node_names[] = {
     "NULL",
 };
 
+void print_escaped_char(char c) {
+    switch (c) {
+    case '\a':
+        fprintf(stderr, "\\a");
+        break;
+    case '\b':
+        fprintf(stderr, "\\b");
+        break;
+    case '\t':
+        fprintf(stderr, "\\t");
+        break;
+    case '\n':
+        fprintf(stderr, "\\n");
+        break;
+    case '\v':
+        fprintf(stderr, "\\v");
+        break;
+    case '\f':
+        fprintf(stderr, "\\f");
+        break;
+    case '\r':
+        fprintf(stderr, "\\r");
+        break;
+    case '\e':
+        fprintf(stderr, "\\e");
+        break;
+    case '\0':
+        fprintf(stderr, "\\0");
+        break;
+    default:
+        fprintf(stderr, "%c", c);
+        break;
+    }
+}
+
+void print_initializer_as_string(Initializer *init) {
+    for (; init; init = init->next) {
+        print_escaped_char((char)init->val);
+    }
+}
+
+void print_initializer_array(Initializer *init) {
+    for (; init; init = init->next) {
+        fprintf(stderr, "%ld, ", init->val);
+    }
+}
+
 void print_string_literal(char *str) {
     for (int i = 0; str[i]; i++) {
-        switch (str[i])
-        {
-        case '\a':
-            fprintf(stderr, "\\a");
-            break;
-        case '\b':
-            fprintf(stderr, "\\b");
-            break;
-        case '\t':
-            fprintf(stderr, "\\t");
-            break;
-        case '\n':
-            fprintf(stderr, "\\n");
-            break;
-        case '\v':
-            fprintf(stderr, "\\v");
-            break;
-        case '\f':
-            fprintf(stderr, "\\f");
-            break;
-        case '\r':
-            fprintf(stderr, "\\r");
-            break;
-        case '\e':
-            fprintf(stderr, "\\e");
-            break;
-        default:  
-            fputc(str[i], stderr);
-            break;
-        }
+        print_escaped_char(str[i]);
     }
 }
 
@@ -197,7 +215,7 @@ void print_node(Node *node, int depth) {
             print_unary_node(node, depth);
             break;
         case ND_VAR:
-            if (!node->var->contents) {
+            if (!node->var->initializer) {
                 fprintf(stderr, "%*sVAR %s : ", depth, " ", node->var->name);
                 print_type(node->ty);
             }
@@ -205,7 +223,7 @@ void print_node(Node *node, int depth) {
                 fprintf(stderr, "%*sVAL : ", depth, " ");
                 print_type(node->ty);
                 fprintf(stderr, " = \"");
-                print_string_literal(node->var->contents);
+                print_initializer_as_string(node->var->initializer);
                 fprintf(stderr, "\"");
             }
             fprintf(stderr, "\n");
@@ -358,9 +376,27 @@ void print_global_variables(VarList *vl) {
         fprintf(stderr, "VAR %s : ",vl->var->name);
         print_type(vl->var->ty);
 
-        // todo: char* 以外の変数も出力したい
-        if (vl->var->ty->kind == TY_ARRAY && vl->var->ty->base->kind == TY_CHAR) {
-            fprintf(stderr, " = \"%s\"", vl->var->contents);
+        if (vl->var->initializer) {
+            if (vl->var->ty->kind == TY_ARRAY) {
+                if (vl->var->ty->base->kind == TY_CHAR) {
+                    fprintf(stderr, " = \"");
+                    print_initializer_as_string(vl->var->initializer);
+                    fprintf(stderr, "\"");
+                }
+                else {
+                    fprintf(stderr, " = {");
+                    print_initializer_array(vl->var->initializer);
+                    fprintf(stderr, "}");
+                }
+            }
+            else {
+                if (vl->var->initializer->label) {
+                    fprintf(stderr, " = %s", vl->var->initializer->label);
+                }
+                else {
+                    fprintf(stderr, " = %ld", vl->var->initializer->val);
+                }
+            }
         }
 
         fprintf(stderr, "\n");
