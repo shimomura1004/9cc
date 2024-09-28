@@ -171,6 +171,7 @@ Node *declaration();
 bool is_typename();
 Node *stmt();
 Node *expr();
+long eval(Node *node);
 long const_expr();
 Node *assign();
 Node *conditional();
@@ -743,17 +744,73 @@ void expect_end() {
     expect("}");
 }
 
-// global-var = type-specifier declarator type-suffix ";"
+Initializer *new_init_val(Initializer *cur, int sz, int val) {
+    Initializer *init = calloc(1, sizeof(Initializer));
+    init->sz = sz;
+    init->val = val;
+    cur->next = init;
+    return init;
+}
+
+Initializer *new_init_label(Initializer *cur, char *label) {
+    Initializer *init = calloc(1, sizeof(Initializer));
+    init->label = label;
+    cur->next = init;
+    return init;
+}
+
+Initializer *gvar_init_string(char *p, int len) {
+    Initializer head;
+    head.next = NULL;
+    Initializer *cur = &head;
+    for (int i = 0; i < len; i++) {
+        cur = new_init_val(cur, 1, p[i]);
+    }
+    return head.next;
+}
+
+Initializer *gvar_initializer(Initializer *cur, Type *ty) {
+    Token *tok = token;
+    Node *expr = conditional();
+
+    // グローバル変数の初期化に使えるのは…
+    // 他のグローバル変数のポインタか
+    if (expr->kind == ND_ADDR) {
+        if (expr->lhs->kind != ND_VAR) {
+            error_tok(tok, "invalid initializer");
+        }
+        return new_init_label(cur, expr->lhs->var->name);
+    }
+
+    // 配列型の変数(実質ポインタ)か
+    if (expr->kind == ND_VAR && expr->var->ty->kind == TY_ARRAY) {
+        return new_init_label(cur, expr->var->name);
+    }
+
+    // 定数式である
+    return new_init_val(cur, size_of(ty, token), eval(expr));
+}
+
+// global-var = type-specifier declarator type-suffix ("=" gvar-initializer)? ";"
 void global_var() {
     Type *ty = type_specifier();
     Token *tok = token;
     char *name = NULL;
     ty = declarator(ty, &name);
     ty = type_suffix(ty);
-    expect(";");
 
     Var *var = push_var(name, ty, false, tok);
     push_scope(name)->var = var;
+
+    if (consume("=")) {
+        // グローバル変数に初期化子がついている場合
+        Initializer head;
+        head.next = NULL;
+        gvar_initializer(&head, ty);
+        var->initializer = head.next;
+    }
+
+    expect(";");
 }
 
 typedef struct Designator Designator;
@@ -1712,8 +1769,7 @@ Node *primary() {
         // 変数ではなくラベルを登録する
         // ラベルはコード生成時にラベルとして使われる
         Var *var = push_var(new_label(), ty, false, NULL);
-        var->contents = tok->contents;
-        var->cont_len = tok->cont_len;
+        var->initializer = gvar_init_string(tok->contents, tok->cont_len);
         // 文字列リテラルは変数として扱う
         return new_var(var, tok);
     }

@@ -9,6 +9,7 @@
 
 typedef struct Type Type;
 typedef struct Member Member;
+typedef struct Initializer Initializer;
 
 //
 // Tokenizer
@@ -48,8 +49,7 @@ struct Var {
     int offset;     // RBP からのオフセット(ローカル変数のときのみ使用)
 
     // グローバル変数用
-    char *contents;
-    int cont_len;
+    Initializer *initializer;
 };
 
 // 変数のリスト
@@ -171,6 +171,19 @@ struct Node {
 
     Var *var;           // kind が ND_VAR の場合のみ使う
     long val;           // kind が ND_NUM の場合のみ使う
+};
+
+// グローバル変数の初期化子を保持する構造体
+// グローバル変数は定数式かほかのグローバル変数へのポインタで初期化される
+struct Initializer {
+    Initializer *next;
+
+    // 定数式用
+    int sz;
+    long val;
+
+    // 他のグローバル変数へのポインタ用
+    char *label;
 };
 
 // 関数の情報を保持する構造体

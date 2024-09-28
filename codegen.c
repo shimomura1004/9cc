@@ -756,17 +756,28 @@ void emit_data(Program *prog) {
         // ラベルは単にアドレスのエイリアス
         printf("%s:\n", var->name);
 
-        if (!var->contents) {
-            // コンテンツがないということは、これは文字列ではない
-            // グローバル変数の場合はゼロ初期化する
+        if (!var->initializer) {
+            // 初期化子がないグローバル変数はゼロ初期化する
             // .zero は、指定したバイト数分の領域を 0 初期化して確保する
             printf("  .zero %d\n", size_of(var->ty, var->tok));
             continue;
         }
 
-        // 文字列リテラルの場合は一文字ずつ出力
-        for (int i = 0; i < var->cont_len; i++) {
-            printf("  .byte %d\n", var->contents[i]);
+        // 初期化子がある場合は順番に出力
+        for (Initializer *init = var->initializer; init; init = init->next) {
+            if (init->label) {
+                // 他の変数のポインタの場合は、64ビットデータ(quad)としてラベルをそのまま出力
+                printf("  .quad %s\n", init->label);
+                continue;
+            }
+
+            // その他、サイズに応じてデータを出力
+            if (init->sz == 1) {
+                printf("  .byte %ld\n", init->val);
+            }
+            else {
+                printf("  .%dbyte %ld\n", init->sz, init->val);
+            }
         }
     }
 }
