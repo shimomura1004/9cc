@@ -744,6 +744,7 @@ void expect_end() {
     expect("}");
 }
 
+// 指定された値で初期化する初期化子
 Initializer *new_init_val(Initializer *cur, int sz, int val) {
     Initializer *init = calloc(1, sizeof(Initializer));
     init->sz = sz;
@@ -752,6 +753,7 @@ Initializer *new_init_val(Initializer *cur, int sz, int val) {
     return init;
 }
 
+// 他変数へのポインタで初期化する初期化子
 Initializer *new_init_label(Initializer *cur, char *label) {
     Initializer *init = calloc(1, sizeof(Initializer));
     init->label = label;
@@ -759,6 +761,15 @@ Initializer *new_init_label(Initializer *cur, char *label) {
     return init;
 }
 
+// 指定された数のゼロで初期化する初期化子
+Initializer *new_init_zero(Initializer *cur, int nbytes) {
+    for (int i = 0; i < nbytes; i++) {
+        cur = new_init_val(cur, 1, 0);
+    }
+    return cur;
+}
+
+// 指定された文字列で初期化する初期化子
 Initializer *gvar_init_string(char *p, int len) {
     Initializer head;
     head.next = NULL;
@@ -769,8 +780,86 @@ Initializer *gvar_init_string(char *p, int len) {
     return head.next;
 }
 
+// 構造体のパディング部分を埋める初期化子
+Initializer *emit_struct_padding(Initializer *cur, Type *parent, Member *mem) {
+    // 対象のメンバの終端の位置を計算
+    int end = mem->offset + size_of(mem->ty, token);
+
+    // 出力するパディングのサイズ
+    int padding;
+    if (mem->next) {
+        // 次のメンバがある場合は、次のメンバの開始位置との差を計算
+        padding = mem->next->offset - end;
+    }
+    else {
+        // 次のメンバがない場合(最後のメンバの場合)は、親である構造体のサイズとの差を計算
+        padding = size_of(parent, token) - end;
+    }
+
+    // パディングが必要な場合のみ 0 埋めする初期化子を追加
+    if (padding) {
+        cur = new_init_zero(cur, padding);
+    }
+
+    return cur;
+}
+
+// グローバル変数の初期化子
 Initializer *gvar_initializer(Initializer *cur, Type *ty) {
     Token *tok = token;
+
+    // 初期化に使う値がカッコで始まる場合は配列か構造体
+    if (consume("{")) {
+        if (ty->kind == TY_ARRAY) {
+            int i = 0;
+
+            // 再帰して配列の中身の初期化子を作る
+            do {
+                cur = gvar_initializer(cur, ty->base);
+                i++;
+            } while (!peek_end() && consume(","));
+
+            expect_end();
+
+            if (i < ty->array_size) {
+                // 初期化するデータが足りない場合は 0 埋めする
+                cur = new_init_zero(cur, size_of(ty->base, tok) * (ty->array_size - i));
+            }
+
+            // 配列のサイズが指定されていない場合は補う
+            if (ty->is_incomplete) {
+                ty->array_size = i;
+                ty->is_incomplete = false;
+            }
+
+            return cur;
+        }
+
+        if (ty->kind == TY_STRUCT) {
+            Member *mem = ty->members;
+
+            do {
+                // 再帰して構造体の各メンバの初期化子を作る
+                cur = gvar_initializer(cur, mem->ty);
+                // 必要ならパディング分の初期化子を追加する
+                cur = emit_struct_padding(cur, ty, mem);
+                mem = mem->next;
+            } while (!peek_end() && consume(","));
+
+            expect_end();
+
+            if (mem) {
+                // まだ初期化されていないメンバが残っている場合は 0 埋めする
+                int sz = size_of(ty, tok) - mem->offset;
+                if (sz) {
+                    cur = new_init_zero(cur, sz);
+                }
+            }
+
+            return cur;
+        }
+    }
+
     Node *expr = conditional();
 
     // グローバル変数の初期化に使えるのは…
